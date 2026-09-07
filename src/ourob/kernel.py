@@ -51,6 +51,7 @@ class RunOutcome:
     denied: int = 0
     failed: int = 0
     snapshot: str = ""
+    touched: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -67,6 +68,8 @@ class RunOutcome:
         ]
         if self.snapshot:
             lines.append(f"  snapshot  {self.snapshot}")
+        if self.touched:
+            lines.append(f"  touched   {', '.join(self.touched)}")
         if self.report is not None:
             lines.append("  " + format_report(self.report).replace("\n", "\n  "))
         return "\n".join(lines)
@@ -186,6 +189,7 @@ class Kernel:
 
             result = self.registry.dispatch(invocation, self._skill_context(run.run_id, step.index))
             step.result = result
+            run.record_artifacts(result.artifacts)
             step.status = StepStatus.OK if result.ok else StepStatus.ERROR
             self.state.record(
                 run.run_id, "skill.result", {"index": step.index, "result": result.to_dict()}
@@ -227,6 +231,7 @@ class Kernel:
             denied=len(run.denied_steps),
             failed=sum(1 for s in run.steps if s.result is not None and not s.result.ok),
             snapshot=snapshot_id,
+            touched=list(run.touched),
         )
         self.state.close_run(run)
         return outcome

@@ -8,6 +8,7 @@ install step.
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import sys
 from collections.abc import Sequence
@@ -206,6 +207,86 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"`ourob promote --snapshot {outcome.snapshot}` will roll the tree back."
         )
     return 0 if outcome.ok else 1
+
+
+def _read_text(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def cmd_diff(args: argparse.Namespace) -> int:
+    """Show what a run actually changed, from the journal and its snapshot."""
+    repo = _repo(args)
+    store = StateStore(repo)
+    run = store.replay(args.run_id)
+    if not run.touched:
+        print(f"run {run.run_id} recorded no file changes")
+        return 0
+
+    snapshot_root = repo / ".ourob" / "snapshots" / run.run_id / "tree"
+    have_snapshot = snapshot_root.is_dir()
+    print(
+        f"run {run.run_id}  status={run.status.value}  "
+        f"{len(run.touched)} file(s) touched"
+    )
+    print(
+        f"baseline: {'snapshot ' + run.run_id if have_snapshot else 'none (read-only run)'}"
+    )
+    print()
+
+    for relpath in run.touched:
+        before = _read_text(snapshot_root / relpath) if have_snapshot else None
+        after = _read_text(repo / relpath)
+        if not have_snapshot:
+            kind = "unbaselined"
+        elif before is None and after is None:
+            kind = "vanished"
+        elif before is None:
+            kind = "added"
+        elif after is None:
+            kind = "deleted"
+        elif before == after:
+            kind = "unchanged"
+        else:
+            kind = "modified"
+
+        if args.stat:
+            print(f"  {kind:<12} {relpath}")
+            continue
+
+        print(f"--- {kind}: {relpath}")
+        if kind == "unchanged":
+            print("    (restored to its pre-run content)")
+            continue
+        if kind == "vanished":
+            print("    (absent both before and after the run)")
+            continue
+        if kind == "unbaselined":
+            print("    (no pre-run baseline; this run took no snapshot)")
+            continue
+        diff = difflib.unified_diff(
+            (before or "").splitlines(keepends=True),
+            (after or "").splitlines(keepends=True),
+            fromfile=f"a/{relpath}",
+            tofile=f"b/{relpath}",
+            n=args.context,
+        )
+        lines = list(diff)
+        if not lines:
+            print("    (no textual difference)")
+            continue
+        limit = lines[: args.max_lines]
+        print("".join(line if line.endswith("\n") else line + "\n" for line in limit).rstrip())
+        if len(lines) > len(limit):
+            print(f"    ... {len(lines) - len(limit)} more diff line(s)")
+        print()
+
+    if not args.stat:
+        return 0
+    print()
+    print("  ".join(["summary:", f"{len(run.touched)} file(s)"]))
+    return 0
 
 
 def cmd_promote(args: argparse.Namespace) -> int:
@@ -466,6 +547,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_ratify)
 
     sub.add_parser("runs", help="list recorded runs").set_defaults(func=cmd_runs)
+
+    p = sub.add_parser("diff", help="show what a recorded run actually changed")
+    p.add_argument("run_id")
+    p.add_argument("--stat", action="store_true", help="list files and kinds only")
+    p.add_argument("--context", type=int, default=3, help="diff context lines")
+    p.add_argument("--max-lines", type=int, default=200, help="cap the diff per file")
+    p.set_defaults(func=cmd_diff)
 
     p = sub.add_parser("journal", help="read the hash-chained journal")
     p.add_argument("run_id", nargs="?", default=None)

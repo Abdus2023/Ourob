@@ -1,9 +1,9 @@
 {
   "format": "ourob.bootstrap.lock/v1",
-  "version": 12,
-  "created_at": "2026-09-07T07:48:59Z",
-  "notes": "policies: path confinement is a declared contract (path: true in the skill schema), enforced statically by check_spec; retire the path-key-coverage advisory policy",
-  "digest": "33fa1aa1cbc2a76a30ecae24590ab597c807fd337148701c334a2cc0f82c2cdc",
+  "version": 13,
+  "created_at": "2026-09-07T07:54:47Z",
+  "notes": "make promotion human-reviewable: journal the touched set, add ourob diff <run>, and list every touched file in the promotion record",
+  "digest": "e052a304113a6995507c2ec8f29299b1d59f2a406882a0c6c650ca10facabbaa",
   "files": [
     {
       "path": ".coverage",
@@ -109,8 +109,8 @@
     },
     {
       "path": "src/ourob/bootstrap/promote.py",
-      "sha256": "cc0bfa97149c7f07374993fa5cc246ffe3cf16819664b1d585b926e1981576c9",
-      "size": 10341,
+      "sha256": "29b3713340827b2b8c401db5e8ff2b8950d54664dbb038c0776d2ffe2d01a047",
+      "size": 10422,
       "protected": true
     },
     {
@@ -121,8 +121,8 @@
     },
     {
       "path": "src/ourob/cli.py",
-      "sha256": "0847095daefb06f0e00925bc3e556519e174a7800414bdb90c871a3691676070",
-      "size": 19914,
+      "sha256": "f9556369c2672b0157c3db167e49411fba4a62722d05685a1c9dc0e63f61bc65",
+      "size": 22920,
       "protected": false
     },
     {
@@ -151,8 +151,8 @@
     },
     {
       "path": "src/ourob/kernel.py",
-      "sha256": "24605eeb8b2794f7ee62d18adc541f52595e2492170a624ec03e46a5a3386d99",
-      "size": 13169,
+      "sha256": "72f3b948358e01c3a4d42b28df84e4a149d8df2fb04b597b483881221da28527",
+      "size": 13404,
       "protected": false
     },
     {
@@ -259,14 +259,14 @@
     },
     {
       "path": "src/ourob/state/model.py",
-      "sha256": "e077e10bbc2e63df7f6e4bc6aad67805d5202a2f07c6b159868b335e4884bc28",
-      "size": 8979,
+      "sha256": "b4da102a0afba4e28bc6afb822a303a916844d2df1c643750beab16069a7ea6f",
+      "size": 9473,
       "protected": false
     },
     {
       "path": "src/ourob/state/store.py",
-      "sha256": "17f66b02a3dabd7d75df6c1eae370475e2f21de58329d380a269d2ece5b1151b",
-      "size": 13088,
+      "sha256": "68816bd8d4cd6d527a9d68cb1522768dad59846dc20c8c584321e94ab3ec85a4",
+      "size": 13451,
       "protected": false
     },
     {
@@ -339,6 +339,12 @@
       "path": "tests/test_policies.py",
       "sha256": "addc20ce87de89408157116ac4f3fdb93bfc0867314a13662b5c432fc425fee7",
       "size": 11544,
+      "protected": false
+    },
+    {
+      "path": "tests/test_review.py",
+      "sha256": "de949443e6cde16ec0838127d836892ce005a2aeab145614e28dafc22157ef93",
+      "size": 9269,
       "protected": false
     },
     {

@@ -65,6 +65,8 @@ class PromotionResult:
             f"promotion {'ACCEPTED' if self.accepted else 'REJECTED'} at {self.created_at}",
             f"  drift: {self.diff.describe()}",
         ]
+        for path in self.diff.touched:
+            lines.append(f"    - {path}")
         if self.protected:
             lines.append(f"  protected paths touched: {', '.join(self.protected)}")
         if self.amendment_id:

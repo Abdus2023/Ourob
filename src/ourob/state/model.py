@@ -8,6 +8,7 @@ what makes a run replayable and a crash recoverable.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 from pathlib import Path
@@ -277,6 +278,8 @@ class Run:
     planner: str = "unknown"
     outcome: str = ""
     verification: VerificationReport | None = None
+    #: Repository-relative paths the run's skills reported touching, in order.
+    touched: list[str] = field(default_factory=list)
 
     @property
     def step_count(self) -> int:
@@ -290,6 +293,12 @@ class Run:
         step = Step(index=len(self.steps), invocation=invocation)
         self.steps.append(step)
         return step
+
+    def record_artifacts(self, artifacts: Iterable[str]) -> None:
+        """Append newly seen artifact paths, preserving first-touch order."""
+        for artifact in artifacts:
+            if artifact and artifact not in self.touched:
+                self.touched.append(artifact)
 
     def to_dict(self) -> dict[str, Any]:
         return jsonable(
@@ -305,6 +314,7 @@ class Run:
                 "outcome": self.outcome,
                 "steps": self.steps,
                 "verification": self.verification,
+                "touched": self.touched,
             }
         )
 

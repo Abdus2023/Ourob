@@ -180,6 +180,7 @@ class StateStore:
                 "status": run.status,
                 "outcome": run.outcome,
                 "steps": run.step_count,
+                "touched": run.touched,
                 "ended_at": run.ended_at,
             },
         )
@@ -191,6 +192,7 @@ class StateStore:
                 "status": run.status,
                 "steps": run.step_count,
                 "outcome": run.outcome,
+                "touched": run.touched,
             },
         )
 
@@ -216,6 +218,7 @@ class StateStore:
                         status=payload.get("status"),
                         steps=payload.get("steps"),
                         outcome=payload.get("outcome"),
+                        touched=payload.get("touched", []),
                         closed=event.get("stamp"),
                     )
         return [runs[k] for k in sorted(runs)]
@@ -256,6 +259,9 @@ class StateStore:
                 step = steps.get(int(payload["index"]))
                 if step is not None:
                     step.result = SkillResult.from_dict(payload.get("result", {}))
+                    # Artifacts are re-derived from the log so that a replayed run
+                    # reports the same touched set as the original one did.
+                    run.record_artifacts(step.result.artifacts)
                     if payload.get("denied"):
                         step.status = StepStatus.DENIED
                     elif step.status is not StepStatus.DENIED:
