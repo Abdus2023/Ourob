@@ -91,6 +91,13 @@ has to work in a bare checkout with no history, and it has to be exact about
 files a self-modifying process just invented. The snapshot also carries a copy of
 the lock itself — rolling back must not un-anchor the tree.
 
+**Rollback is exact, which means it is not selective.** `ourob snapshots
+--rollback <run>` restores every file the snapshot recorded and deletes every
+file it did not. Anything written after the snapshot was taken goes with it,
+including unrelated work. That is the correct behaviour for "put the tree back the
+way it was", but it is a sharp edge: if you have been editing while a failed run
+sits un-rolled-back, roll back before you continue, not after.
+
 ---
 
 ## Why the verifier re-reads the config out of process

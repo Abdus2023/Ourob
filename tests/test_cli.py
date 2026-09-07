@@ -292,6 +292,19 @@ def test_snapshots_listing(repo: Path) -> None:
     assert code == 0 and "discarded snapshot" in out
 
 
+def test_snapshot_rollback_restores_the_tree(repo: Path) -> None:
+    run(repo, "run", "plans/self_extend.json")
+    code, out = run(repo, "snapshots")
+    run_id = out.strip().splitlines()[0].split()[0]
+
+    assert (repo / "tests" / "test_contrib_rot13.py").is_file()
+    code, out = run(repo, "snapshots", "--rollback", run_id)
+    assert code == 0
+    assert "rolled back to snapshot" in out
+    assert not (repo / "tests" / "test_contrib_rot13.py").exists()
+    assert "drift since snapshot: no drift" in out
+
+
 def test_selftest(repo: Path) -> None:
     code, out = run(repo, "selftest")
     assert code == 0, out

@@ -161,7 +161,7 @@ runs        list recorded runs
 journal     read (or verify) the hash-chained journal
 show        replay a run from its journal
 coldstart   verify the tree and boot from it
-snapshots   list or discard rollback snapshots
+snapshots   list, roll back to, or discard a snapshot
 selftest    every read-only command, end to end
 ```
 

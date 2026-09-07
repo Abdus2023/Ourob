@@ -1,9 +1,9 @@
 {
   "format": "ourob.bootstrap.lock/v1",
-  "version": 9,
-  "created_at": "2026-09-07T07:21:53Z",
-  "notes": "verify: resolve amendment coverage with Amendment.covers so directory-pattern amendments cover the files under them",
-  "digest": "bf43153d3141adb3bc757dd92ffe87c27e7c7875afb74e9f03f651dfdc7e9c25",
+  "version": 10,
+  "created_at": "2026-09-07T07:26:33Z",
+  "notes": "cli: 'snapshots --rollback RUN' restores a tree exactly, without needing an amendment",
+  "digest": "1f286e9933effa0bc122b11779c04f68e30f38763a071db4a53e47e22cbdd086",
   "files": [
     {
       "path": ".gitignore",
@@ -13,8 +13,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "ccb78b3abe2d00fc79944cdcc5f70e184a59b1f4a9e11ddfcf013f236decd3f2",
-      "size": 8186,
+      "sha256": "ee4a4932198bc4996cd35ed0af6ef7946a0069d21432501bfe81f3df22d85f72",
+      "size": 8193,
       "protected": false
     },
     {
@@ -25,8 +25,8 @@
     },
     {
       "path": "docs/ARCHITECTURE.md",
-      "sha256": "1bc560f8a33bb6c1833ac19be59b48b70065e1192bb6227639f1bca332432e84",
-      "size": 6755,
+      "sha256": "457c90a71d444dc90e21dcd088101e96ddef8b8541a65f93c55d7c5d2bc93f17",
+      "size": 7211,
       "protected": false
     },
     {
@@ -115,8 +115,8 @@
     },
     {
       "path": "src/ourob/cli.py",
-      "sha256": "c5d70ccc1c84d2f8939e6b3c33655aebaf4c92a31a6a3e2c09564823b47d6845",
-      "size": 18680,
+      "sha256": "e1c1e9ece322051149bcd0d94048d50146fc7756c1aca09db35beadc6888eddc",
+      "size": 19321,
       "protected": false
     },
     {
@@ -295,8 +295,8 @@
     },
     {
       "path": "tests/test_cli.py",
-      "sha256": "4d3956f6625cc749d9d2e50c466fabdad6791977ce84a122efd138e73ce7f9a9",
-      "size": 9870,
+      "sha256": "3f50e16e54113d4f14fa1b8c5d3e1aaf71235c7673891dcc2b284bf125a87a81",
+      "size": 10385,
       "protected": false
     },
     {

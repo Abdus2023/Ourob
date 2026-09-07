@@ -328,6 +328,16 @@ def cmd_coldstart(args: argparse.Namespace) -> int:
 
 def cmd_snapshots(args: argparse.Namespace) -> int:
     repo = _repo(args)
+    if args.rollback:
+        snapshot = Snapshot.load(repo, args.rollback)
+        outcome = snapshot.restore()
+        print(f"rolled back to snapshot {args.rollback}")
+        restored = ", ".join(outcome["restored"]) or "(none)"
+        removed = ", ".join(outcome["removed"]) or "(none)"
+        print(f"  restored {len(outcome['restored'])} file(s): {restored}")
+        print(f"  removed  {len(outcome['removed'])} file(s): {removed}")
+        print(f"  drift since snapshot: {snapshot.drift_since().describe()}")
+        return 0
     if args.discard:
         Snapshot.load(repo, args.discard).discard()
         print(f"discarded snapshot {args.discard}")
@@ -461,7 +471,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rebuild", action="store_true")
     p.set_defaults(func=cmd_coldstart)
 
-    p = sub.add_parser("snapshots", help="list or discard rollback snapshots")
+    p = sub.add_parser("snapshots", help="list, roll back to, or discard a snapshot")
+    p.add_argument("--rollback", default="", metavar="RUN_ID", help="restore the tree exactly")
     p.add_argument("--discard", default="", metavar="RUN_ID")
     p.set_defaults(func=cmd_snapshots)
 
