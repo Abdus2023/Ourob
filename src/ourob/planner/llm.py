@@ -70,21 +70,54 @@ def _render_view(view: RuntimeView) -> str:
     return "\n".join(lines)
 
 
+def _content_of(body: Any) -> str:
+    """Pull the assistant message out of a chat-completions response.
+
+    Anything that is not the documented shape is a :class:`ConfigError`, not a
+    ``KeyError``: the endpoint is untrusted, and "the model gateway replied with
+    something we did not expect" is a configuration problem worth naming.
+    """
+    if not isinstance(body, dict):
+        raise ConfigError(f"gateway replied with a {type(body).__name__}, not an object")
+    choices = body.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ConfigError(f"gateway reply has no choices: {str(body)[:300]}")
+    message = choices[0].get("message") if isinstance(choices[0], dict) else None
+    if not isinstance(message, dict) or "content" not in message:
+        raise ConfigError(f"gateway reply has no message content: {str(body)[:300]}")
+    return str(message.get("content") or "")
+
+
 def _extract_json(text: str) -> dict[str, Any]:
+    """Pull the action object out of a model reply.
+
+    Two-stage on purpose.  If the reply (or its fenced block) *is* valid JSON,
+    that is taken as the whole answer and anything but an object is a protocol
+    violation -- silently unwrapping ``[{...}]`` into ``{...}`` would hide a model
+    that is not following the contract.  Only when the reply is not valid JSON on
+    its own do we fall back to lifting the first object out of surrounding prose.
+    """
     text = text.strip()
     fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    if fenced:
-        text = fenced.group(1)
-    else:
-        brace = re.search(r"\{.*\}", text, re.DOTALL)
-        if brace:
-            text = brace.group(0)
+    candidate = fenced.group(1) if fenced else text
+
     try:
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise ConfigError(f"model reply was not JSON: {exc}\n---\n{text[:500]}") from exc
+        data = json.loads(candidate)
+    except json.JSONDecodeError:
+        brace = re.search(r"\{.*\}", candidate, re.DOTALL)
+        if brace is None:
+            raise ConfigError(
+                f"model reply contained no JSON object:\n---\n{candidate[:500]}"
+            ) from None
+        try:
+            data = json.loads(brace.group(0))
+        except json.JSONDecodeError as exc:
+            raise ConfigError(
+                f"model reply was not JSON: {exc}\n---\n{brace.group(0)[:500]}"
+            ) from exc
+
     if not isinstance(data, dict):
-        raise ConfigError(f"model reply was not an object: {text[:200]}")
+        raise ConfigError(f"model reply was not an object: {str(data)[:200]}")
     return data
 
 
@@ -102,9 +135,10 @@ class OpenAIPlanner(Planner):
         temperature: float = 0.2,
         max_tokens: int = 1500,
         timeout: float = 120.0,
+        transport: Any | None = None,
     ) -> None:
         try:
-            import httpx  # noqa: F401
+            import httpx
         except ImportError as exc:  # pragma: no cover - depends on environment
             raise ConfigError(
                 "the LLM planner needs httpx; install with `pip install ourob[llm]`"
@@ -112,15 +146,27 @@ class OpenAIPlanner(Planner):
         self.api_key = api_key or os.environ.get("OUROB_API_KEY", "")
         if not self.api_key:
             raise ConfigError("OUROB_API_KEY is not set")
-        self.base_url = (base_url or os.environ.get("OUROB_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
+        self.base_url = (
+            base_url or os.environ.get("OUROB_BASE_URL") or "https://api.openai.com/v1"
+        ).rstrip("/")
         self.model = model or os.environ.get("OUROB_MODEL", "gpt-4o-mini")
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.timeout = timeout
+        # ``transport`` exists so the planner can be exercised against a fake
+        # gateway; it is not a configuration knob and is never read from the env.
+        self._client = httpx.Client(transport=transport, timeout=timeout)
+
+    def close(self) -> None:
+        self._client.close()
+
+    def __enter__(self) -> OpenAIPlanner:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
 
     def next_action(self, view: RuntimeView) -> Invocation | None:
-        import httpx
-
         payload = {
             "model": self.model,
             "temperature": self.temperature,
@@ -130,16 +176,17 @@ class OpenAIPlanner(Planner):
                 {"role": "user", "content": _render_view(view)},
             ],
         }
-        response = httpx.post(
+        response = self._client.post(
             f"{self.base_url}/chat/completions",
             headers={"authorization": f"Bearer {self.api_key}"},
             json=payload,
-            timeout=self.timeout,
         )
         response.raise_for_status()
-        body = response.json()
-        content = body["choices"][0]["message"]["content"] or ""
-        data = _extract_json(content)
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise ConfigError(f"gateway reply was not JSON: {exc}") from exc
+        data = _extract_json(_content_of(body))
         skill_name = data.get("skill")
         if skill_name in (None, "", "null", "none"):
             return None

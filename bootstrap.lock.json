@@ -1,10 +1,16 @@
 {
   "format": "ourob.bootstrap.lock/v1",
-  "version": 10,
-  "created_at": "2026-09-07T07:26:33Z",
-  "notes": "cli: 'snapshots --rollback RUN' restores a tree exactly, without needing an amendment",
-  "digest": "1f286e9933effa0bc122b11779c04f68e30f38763a071db4a53e47e22cbdd086",
+  "version": 11,
+  "created_at": "2026-09-07T07:42:32Z",
+  "notes": "pin the rollback/lock invariant (11 tests); test the LLM planner end to end (0% -> 100%); make the gateway parse strict and injectable",
+  "digest": "391fe6ddc983d3c01faddeeffeb245b6ca96471d7de1aac729c9ee7c1abf4d57",
   "files": [
+    {
+      "path": ".coverage",
+      "sha256": "6f9984ef22e08cf4b214544d7d4f428b32c6a5214c832c29fb08c58e444fed8f",
+      "size": 53248,
+      "protected": false
+    },
     {
       "path": ".gitignore",
       "sha256": "2b0bbb329fadd3271ead2446c1341afd42655620acf112dbc3781fa86ef272cc",
@@ -163,8 +169,8 @@
     },
     {
       "path": "src/ourob/planner/llm.py",
-      "sha256": "2a20c106a18f1e5791363ea9b5602bd8c3b28962cca3dd828d83c9bb52bce49a",
-      "size": 5671,
+      "sha256": "62f600cc78a0445d9041da8dd7d4418e0bbf5269f8dace25b2ee33c4e7300d8e",
+      "size": 7818,
       "protected": false
     },
     {
@@ -318,6 +324,12 @@
       "protected": false
     },
     {
+      "path": "tests/test_llm_planner.py",
+      "sha256": "2c8faea8b6d720cd43848fd16f6c5e64029520b13b90612247658124a49c75ec",
+      "size": 15872,
+      "protected": false
+    },
+    {
       "path": "tests/test_manifest.py",
       "sha256": "7d05cabe34fda7fdf113e111c11c775baf834bd0f9fa359cfcff09f3315b30ba",
       "size": 4525,
@@ -327,6 +339,12 @@
       "path": "tests/test_policies.py",
       "sha256": "43e8fc5055a6a5f03793cec1b3d8dbb9d4c533c06d38dda28179c21354b357c2",
       "size": 9661,
+      "protected": false
+    },
+    {
+      "path": "tests/test_rollback_invariant.py",
+      "sha256": "ed39c52b81063f3c51211954d629eebbae7d8e6c60650151d7134b34bb72ab59",
+      "size": 7245,
       "protected": false
     },
     {
