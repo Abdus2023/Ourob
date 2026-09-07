@@ -78,7 +78,7 @@ A half-written contrib skill is quarantined and reported, not fatal.
 
 ### 3. Policies
 
-Eight rules, each about one thing, combined deny-wins. Every verdict — including
+Seven rules, each about one thing, combined deny-wins. Every verdict — including
 the allows — is journalled.
 
 | policy | what it stops |
@@ -90,7 +90,13 @@ the allows — is journalled.
 | `payload-size` | absurd writes |
 | `command-allowlist` | commands outside `ourob.toml` |
 | `loop-breaker` | retrying the same failing call forever |
-| `path-key-coverage` | *(advisory)* path-like arguments in keys the confinement policy does not inspect |
+
+Path confinement is a **declared contract**, not a guess. A skill marks its
+path-bearing parameters with `"path": true` in its schema; `path-confinement`
+confines exactly those, with the conventional key names kept as a net underneath.
+A string parameter whose name looks like a path but does *not* declare itself is
+rejected by the `skill-contract` gate, so the gap is closed at registration time
+rather than warned about at call time.
 
 ### 4. State model
 

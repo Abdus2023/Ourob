@@ -26,7 +26,18 @@ _TYPE_TABLE: dict[str, tuple[type, ...]] = {
     "any": (object,),
 }
 
-SPEC_KEYS = frozenset({"type", "required", "default", "enum", "min", "max", "desc"})
+SPEC_KEYS = frozenset({"type", "required", "default", "enum", "min", "max", "desc", "path"})
+
+#: Parameter names that are path-like by convention.  ``check_spec`` uses this to
+#: insist that such a parameter *declares* ``path: true`` rather than relying on
+#: the policy layer guessing from the key name.
+PATHY_NAMES = frozenset({"path", "file", "dir", "directory", "target", "destination"})
+PATHY_SUFFIXES = ("_path", "_file", "_files", "_dir", "_directory", "_destination", "_dest")
+
+
+def looks_like_a_path(name: str) -> bool:
+    """True when a parameter name suggests it carries a filesystem path."""
+    return name in PATHY_NAMES or name.endswith(PATHY_SUFFIXES)
 
 
 def check_spec(spec: Mapping[str, Any], *, owner: str = "schema") -> list[str]:
@@ -51,6 +62,20 @@ def check_spec(spec: Mapping[str, Any], *, owner: str = "schema") -> list[str]:
             )
         if "enum" in rule and not isinstance(rule["enum"], list):
             problems.append(f"{owner}.{name}: 'enum' must be a list")
+        if "path" in rule:
+            if not isinstance(rule["path"], bool):
+                problems.append(f"{owner}.{name}: 'path' must be a boolean")
+            elif rule["path"] and rule.get("type", "any") != "str":
+                problems.append(
+                    f"{owner}.{name}: declares path: true but its type is "
+                    f"{rule.get('type', 'any')!r}, not 'str'"
+                )
+        elif rule.get("type") == "str" and looks_like_a_path(name):
+            problems.append(
+                f"{owner}.{name}: the name looks like a filesystem path but the "
+                "parameter does not declare path: true, so path confinement "
+                "would not inspect it"
+            )
         for bound in ("min", "max"):
             if bound in rule and not isinstance(rule[bound], (int, float)):
                 problems.append(f"{owner}.{name}: {bound!r} must be a number")

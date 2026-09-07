@@ -16,14 +16,19 @@ from ourob.policies.rules import (
     JournalIntegrityPolicy,
     LoopBreakerPolicy,
     PathConfinementPolicy,
-    PathKeyCoveragePolicy,
     PayloadSizePolicy,
     ProtectedPathPolicy,
     default_policy_set,
 )
 from ourob.state.model import Invocation
 
-MUTATING = {"write_file": True, "edit_file": True, "delete_file": True, "read_file": False}
+MUTATING = {
+    "write_file": True,
+    "edit_file": True,
+    "delete_file": True,
+    "read_file": False,
+    "deploy": True,
+}
 
 
 def ctx(
@@ -206,13 +211,56 @@ def test_loop_breaker_allows_a_different_call(repo: Path) -> None:
     assert verdict.allowed
 
 
-def test_path_key_coverage_warns_but_does_not_block(repo: Path) -> None:
-    context = ctx(repo, "write_file", {"destination_file": "a.py", "content": "x"})
-    verdict = PathKeyCoveragePolicy().review(context)
+def test_a_declared_path_parameter_is_confined(repo: Path) -> None:
+    """The contract: a skill says which parameters carry paths, and confinement
+    honours that regardless of what the key is called."""
+    context = ctx(
+        repo,
+        "deploy",
+        {"destination_file": "../../etc/passwd"},
+        services={
+            "skill_params": {"deploy": {"destination_file": {"type": "str", "path": True}}}
+        },
+    )
+    assert context.declared_path_params() == {"destination_file"}
+    verdict = PathConfinementPolicy().review(context)
     assert not verdict.allowed
-    decision = PathKeyCoveragePolicy().decision(context)
-    assert decision.allowed is False
-    assert decision.severity == "warn"
+    assert "destination_file" in verdict.reason
+
+
+def test_an_undeclared_unusual_key_is_not_confined_by_the_policy(repo: Path) -> None:
+    """Without a declaration the policy cannot know -- which is exactly why the
+    skill-contract gate refuses to register such a skill at all."""
+    context = ctx(repo, "deploy", {"destination_file": "../../etc/passwd"})
+    assert context.declared_path_params() == set()
+    assert PathConfinementPolicy().review(context).allowed
+
+
+def test_conventional_key_names_are_still_confined_without_a_declaration(repo: Path) -> None:
+    """PATH_KEYS is the net underneath the contract, not a replacement for it."""
+    context = ctx(repo, "mystery_skill", {"path": "../../etc/passwd"})
+    assert context.declared_path_params() == set()
+    assert not PathConfinementPolicy().review(context).allowed
+
+
+def test_a_declared_path_reaches_the_protected_path_policy(repo: Path) -> None:
+    """Declaring a path also brings it under the amendment rule."""
+    context = ctx(
+        repo,
+        "deploy",
+        {"destination_file": "src/ourob/policies/rules.py"},
+        services={
+            "skill_params": {"deploy": {"destination_file": {"type": "str", "path": True}}}
+        },
+    )
+    assert not ProtectedPathPolicy().review(context).allowed
+
+
+def test_the_advisory_hole_warner_is_retired() -> None:
+    """Replaced by a declared contract plus a static gate, not a warning."""
+    assert "path-key-coverage" not in POLICY_CLASSES
+    assert not hasattr(__import__("ourob.policies.rules", fromlist=["x"]), "PathKeyCoveragePolicy")
+    assert len(POLICY_CLASSES) == 7
 
 
 # -- the set --------------------------------------------------------------
@@ -232,12 +280,13 @@ def test_policy_set_allows_a_clean_call(repo: Path) -> None:
     assert outcome.allowed, outcome.reason()
 
 
-def test_warnings_do_not_block(repo: Path) -> None:
+def test_a_clean_call_produces_no_warnings(repo: Path) -> None:
     outcome = default_policy_set().review(
-        ctx(repo, "write_file", {"path": "a.py", "target_file": "b.py", "content": "x"})
+        ctx(repo, "write_file", {"path": "src/a.py", "content": "x"})
     )
     assert outcome.allowed
-    assert outcome.warnings
+    assert outcome.warnings == []
+    assert all(d.allowed for d in outcome.decisions)
 
 
 def test_a_crashing_policy_fails_closed(repo: Path) -> None:

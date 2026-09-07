@@ -11,20 +11,28 @@ Seven rules, each about one thing:
 ``command-allowlist``  ``run_command`` may only run what the config allows.
 ``loop-breaker``       the same failing call may not be retried forever.
 
+Path confinement no longer guesses.  A skill declares which of its parameters
+carry paths (``"path": true`` in its schema) and :class:`PathConfinementPolicy`
+confines exactly those; the conventional key names remain as a net underneath.
+A string parameter with a path-like name that does *not* declare itself is
+rejected statically by the ``skill-contract`` gate, so the hole is closed at
+registration time rather than warned about at call time.
+
 These live in a protected directory.  Changing them is a constitutional act.
 """
 
 from __future__ import annotations
 
-from .base import PATH_KEYS, Policy, ReviewContext, Verdict
+from .base import Policy, ReviewContext, Verdict
 
 
 class PathConfinementPolicy(Policy):
     name = "path-confinement"
     title = "Paths stay inside the repository"
     description = (
-        "Every path-bearing argument must resolve inside the repository root. "
-        "Traversal and absolute escapes are refused before the skill runs."
+        "Every argument the skill declared as a path (plus the conventional key "
+        "names) must resolve inside the repository root. Traversal and absolute "
+        "escapes are refused before the skill runs."
     )
     blocking = True
 
@@ -195,41 +203,6 @@ class LoopBreakerPolicy(Policy):
         return Verdict.allow(self.name)
 
 
-class PathKeyCoveragePolicy(Policy):
-    """Advisory: flags path-like arguments that are not confined by key name.
-
-    ``PathConfinementPolicy`` only inspects arguments whose key is in
-    :data:`PATH_KEYS`.  A newly written skill could invent a key like
-    ``destination_file`` and slip past it.  This policy does not block -- it
-    records the fact so the ``skill-contract`` gate and a reviewer can see it.
-    """
-
-    name = "path-key-coverage"
-    title = "Unconfined path-like arguments are reported"
-    description = (
-        "Warns when a string argument looks like a repository path but is not "
-        "carried by a key the confinement policy inspects."
-    )
-    blocking = False
-
-    SUFFIXES = (".py", ".md", ".toml", ".json", ".txt", ".jsonl", ".cfg", ".yaml", ".yml")
-
-    def review(self, ctx: ReviewContext) -> Verdict:
-        covered = set(PATH_KEYS)
-        suspects = [
-            f"{key}={value!r}"
-            for key, value in ctx.args.items()
-            if key not in covered and isinstance(value, str) and value.endswith(self.SUFFIXES)
-        ]
-        if suspects:
-            return Verdict.deny(
-                self.name,
-                "path-like argument outside confinement keys: " + ", ".join(suspects),
-                severity="warn",
-            )
-        return Verdict.allow(self.name)
-
-
 POLICY_CLASSES: dict[str, type[Policy]] = {
     cls.name: cls
     for cls in (
@@ -240,7 +213,6 @@ POLICY_CLASSES: dict[str, type[Policy]] = {
         PayloadSizePolicy,
         CommandAllowlistPolicy,
         LoopBreakerPolicy,
-        PathKeyCoveragePolicy,
     )
 }
 

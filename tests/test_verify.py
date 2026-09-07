@@ -131,6 +131,65 @@ def test_skill_contract_fails_on_an_invalid_schema(repo: Path) -> None:
     assert "unknown type" in result.details
 
 
+def test_skill_contract_rejects_an_undeclared_path_parameter(repo: Path) -> None:
+    """The hole the advisory policy used to warn about is now closed at
+    registration time: a path-like string parameter must declare path: true."""
+    contrib = repo / "src" / "ourob" / "skills" / "contrib"
+    contrib.mkdir(parents=True, exist_ok=True)
+    (contrib / "sneaky.py").write_text(
+        "from typing import Any\n\n"
+        "from ourob.skills.base import Skill, SkillContext, skill\n"
+        "from ourob.state.model import SkillResult\n\n\n"
+        '@skill("sneaky", description="hides a path in an unusual key",\n'
+        '       params={"destination_file": {"type": "str", "required": True}})\n'
+        "class Sneaky(Skill):\n"
+        "    def run(self, ctx: SkillContext, **kwargs: Any) -> SkillResult:\n"
+        "        return SkillResult(ok=True)\n",
+        encoding="utf-8",
+    )
+    result = SkillContractGate().run(gate_ctx(repo))
+    assert not result.passed
+    assert "does not declare path: true" in result.details
+
+
+def test_skill_contract_accepts_a_declared_path_parameter(repo: Path) -> None:
+    contrib = repo / "src" / "ourob" / "skills" / "contrib"
+    contrib.mkdir(parents=True, exist_ok=True)
+    (contrib / "honest.py").write_text(
+        "from typing import Any\n\n"
+        "from ourob.skills.base import Skill, SkillContext, skill\n"
+        "from ourob.state.model import SkillResult\n\n\n"
+        '@skill("honest", description="declares its path",\n'
+        '       params={"destination_file": {"type": "str", "path": True}})\n'
+        "class Honest(Skill):\n"
+        "    def run(self, ctx: SkillContext, **kwargs: Any) -> SkillResult:\n"
+        "        return SkillResult(ok=True)\n",
+        encoding="utf-8",
+    )
+    result = SkillContractGate().run(gate_ctx(repo))
+    assert result.passed, result.details
+    assert "honest" in result.details
+
+
+def test_skill_contract_rejects_a_path_flag_on_a_non_string(repo: Path) -> None:
+    contrib = repo / "src" / "ourob" / "skills" / "contrib"
+    contrib.mkdir(parents=True, exist_ok=True)
+    (contrib / "confused.py").write_text(
+        "from typing import Any\n\n"
+        "from ourob.skills.base import Skill, SkillContext, skill\n"
+        "from ourob.state.model import SkillResult\n\n\n"
+        '@skill("confused", description="wrong type for a path",\n'
+        '       params={"count": {"type": "int", "path": True}})\n'
+        "class Confused(Skill):\n"
+        "    def run(self, ctx: SkillContext, **kwargs: Any) -> SkillResult:\n"
+        "        return SkillResult(ok=True)\n",
+        encoding="utf-8",
+    )
+    result = SkillContractGate().run(gate_ctx(repo))
+    assert not result.passed
+    assert "not 'str'" in result.details
+
+
 def test_compile_passes_on_the_shipped_runtime(repo: Path) -> None:
     result = CompileGate().run(gate_ctx(repo))
     assert result.passed, result.details

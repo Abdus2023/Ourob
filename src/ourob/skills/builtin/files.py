@@ -25,7 +25,8 @@ MAX_READ_BYTES = 400_000
     title="Read a file",
     description="Read a UTF-8 file from the repository and return its text.",
     params={
-        "path": {"type": "str", "required": True, "desc": "repository-relative path"},
+        "path": {"type": "str", "required": True, "path": True,
+                 "desc": "repository-relative path"},
         "max_bytes": {
             "type": "int",
             "default": MAX_READ_BYTES,
@@ -58,7 +59,8 @@ class ReadFile(Skill):
     title="Write a file",
     description="Create or overwrite a file in the repository with the given text.",
     params={
-        "path": {"type": "str", "required": True, "desc": "repository-relative path"},
+        "path": {"type": "str", "required": True, "path": True,
+                 "desc": "repository-relative path"},
         "content": {"type": "str", "required": True, "desc": "full file contents"},
     },
     mutating=True,
@@ -95,7 +97,7 @@ class WriteFile(Skill):
         "occurrences is given."
     ),
     params={
-        "path": {"type": "str", "required": True},
+        "path": {"type": "str", "required": True, "path": True},
         "old_text": {"type": "str", "required": True},
         "new_text": {"type": "str", "required": True},
         "occurrences": {"type": "int", "default": 1, "min": 1, "desc": "how many to replace"},
@@ -141,7 +143,7 @@ class EditFile(Skill):
     "delete_file",
     title="Delete a file",
     description="Remove a file from the repository.",
-    params={"path": {"type": "str", "required": True}},
+    params={"path": {"type": "str", "required": True, "path": True}},
     mutating=True,
 )
 class DeleteFile(Skill):
@@ -166,7 +168,8 @@ class DeleteFile(Skill):
     title="List a directory",
     description="List the entries of a directory in the repository.",
     params={
-        "path": {"type": "str", "default": ".", "desc": "repository-relative directory"},
+        "path": {"type": "str", "default": ".", "path": True,
+                 "desc": "repository-relative directory"},
         "recursive": {"type": "bool", "default": False},
     },
 )
@@ -205,7 +208,8 @@ class ListDir(Skill):
     description="Regular-expression search over text files in the repository.",
     params={
         "pattern": {"type": "str", "required": True},
-        "path": {"type": "str", "default": ".", "desc": "file or directory to search"},
+        "path": {"type": "str", "default": ".", "path": True,
+                 "desc": "file or directory to search"},
         "max_results": {"type": "int", "default": 100, "min": 1, "max": 2000},
         "ignore_case": {"type": "bool", "default": False},
     },

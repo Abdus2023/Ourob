@@ -20,7 +20,12 @@ from ..config import Config
 from ..errors import PolicyViolation
 from ..state.model import Invocation, PolicyDecision
 
-#: Argument keys that carry a filesystem path and therefore get confined.
+#: Argument keys that carry a filesystem path and therefore get confined even
+#: when the skill did not declare them.  This is defence in depth, not the
+#: contract: the contract is ``"path": true`` in the skill's parameter schema,
+#: which :meth:`ReviewContext.declared_path_params` reads.  A skill that declares
+#: nothing still gets its conventional key names confined; a skill that invents a
+#: key name is caught statically by the ``skill-contract`` gate instead.
 PATH_KEYS = frozenset({"path", "file", "target", "directory", "dir", "destination"})
 
 
@@ -66,9 +71,25 @@ class ReviewContext:
     def args(self) -> dict[str, Any]:
         return self.invocation.args or {}
 
+    def declared_path_params(self) -> set[str]:
+        """Parameter names the invoked skill declared with ``path: true``."""
+        specs = self.services.get("skill_params") or {}
+        params = specs.get(self.skill) or {}
+        return {name for name, rule in params.items() if isinstance(rule, dict) and rule.get("path")}
+
     def path_args(self) -> list[tuple[str, str]]:
-        """``(key, value)`` for every argument that names a path."""
-        return [(k, str(v)) for k, v in self.args.items() if k in PATH_KEYS and isinstance(v, str)]
+        """``(key, value)`` for every argument that names a path.
+
+        A parameter counts if the skill declared it as a path, or if its key is
+        one of the conventional :data:`PATH_KEYS`.  The union is deliberate: the
+        declaration is the contract, the key list is the net underneath it.
+        """
+        declared = self.declared_path_params()
+        return [
+            (key, str(value))
+            for key, value in self.args.items()
+            if isinstance(value, str) and (key in declared or key in PATH_KEYS)
+        ]
 
     def ledger(self) -> Any | None:
         return self.services.get("ledger")

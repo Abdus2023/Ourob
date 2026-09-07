@@ -121,7 +121,14 @@ class ListSkills(Skill):
         "Report the self-describing manifest and how the working tree currently "
         "differs from the last ratified state."
     ),
-    params={"path": {"type": "str", "default": "", "desc": "restrict the diff to one path"}},
+    params={
+        "path": {
+            "type": "str",
+            "default": "",
+            "path": True,
+            "desc": "restrict the diff to one path",
+        }
+    },
 )
 class ReadManifest(Skill):
     def run(self, ctx: SkillContext, **kwargs: Any) -> SkillResult:

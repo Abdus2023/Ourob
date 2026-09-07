@@ -234,6 +234,16 @@ def cmd_amend(args: argparse.Namespace) -> int:
         for amendment in amendments:
             print(amendment.summary())
         return 0
+    if args.reject:
+        amendment = ledger.set_status(
+            args.reject, "rejected", evidence={"withdrawn_by": args.by or "operator",
+                                               "reason": args.why or "withdrawn"}
+        )
+        print(f"rejected {amendment.amendment_id}")
+        print(f"  it authorised: {', '.join(amendment.paths)}")
+        print(f"  reason:        {amendment.evidence.get('reason', '')}")
+        print("\nthose paths are protected again.")
+        return 0
     if not args.paths:
         print("usage: ourob amend <path> [<path> ...] --why \"rationale\"", file=sys.stderr)
         return 2
@@ -445,6 +455,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--why", default="", help="rationale")
     p.add_argument("--by", default="", help="who is proposing")
     p.add_argument("--list", action="store_true")
+    p.add_argument("--reject", default="", metavar="AMENDMENT_ID", help="withdraw an amendment")
     p.set_defaults(func=cmd_amend)
 
     p = sub.add_parser("ratify", help="promote under an amendment and mark it ratified")

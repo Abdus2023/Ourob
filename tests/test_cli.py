@@ -244,6 +244,25 @@ def test_amend_and_list(repo: Path) -> None:
     assert "[ratified]" in out
 
 
+def test_amend_can_withdraw_authority(repo: Path) -> None:
+    code, out = run(repo, "amend", "src/ourob/policies/", "--why", "maybe")
+    amendment_id = out.split("proposed ")[1].split()[0]
+
+    code, out = run(repo, "amend", "--reject", amendment_id, "--why", "scope was too broad")
+    assert code == 0
+    assert f"rejected {amendment_id}" in out
+    assert "protected again" in out
+
+    code, out = run(repo, "amend", "--list")
+    assert "[rejected]" in out
+
+    # and a promotion under it is now refused
+    (repo / "src" / "ourob" / "policies" / "rules.py").write_text("# t\n", encoding="utf-8")
+    code, out = run(repo, "promote", "--amendment", amendment_id, "--no-git", "--no-rollback")
+    assert code == 1
+    assert "not active" in out
+
+
 def test_amend_requires_paths(repo: Path) -> None:
     code, out = run(repo, "amend")
     assert code == 2

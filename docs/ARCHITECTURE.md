@@ -44,7 +44,7 @@ transcript of what has happened so far. It sees no more than that.
 planner ──► Invocation ──► PolicySet ──► journal ──► skill ──► journal
 ```
 
-`PolicySet.review` is deny-wins across eight rules. Every verdict — **including
+`PolicySet.review` is deny-wins across seven rules. Every verdict — **including
 the allows** — is written to the journal, so after the fact you can reconstruct
 not just what the runtime did but what it was permitted to do and by which rule.
 
@@ -52,15 +52,19 @@ Policies are small on purpose. Each one inspects a single property of a single
 call. They have no memory of each other and cannot negotiate. A policy that
 raises an exception becomes a denial; the failure direction is always "no".
 
-Two of the eight deserve a note:
+Three of the seven deserve a note:
 
 - **`journal-integrity`** forbids writes to `.ourob/journal`, `.ourob/verify` and
   `.ourob/index.jsonl`. The record of what the runtime did must be harder to
   alter than the thing it records, or the record is worthless.
-- **`path-key-coverage`** is advisory and exists because the confinement policy
-  only inspects arguments whose *key* is in `PATH_KEYS`. A newly written skill
-  could invent a key like `destination_file` and slip past. Rather than pretend
-  that hole does not exist, it is detected and reported.
+- **`path-confinement`** no longer guesses from key names. A skill declares which
+  parameters carry paths (`"path": true` in its schema) and the policy confines
+  exactly those; `PATH_KEYS` remains as a net underneath for skills that declare
+  nothing. The gap this leaves — a skill inventing a key like `destination_file`
+  and not declaring it — is closed *statically*, by `check_spec`, which the
+  `skill-contract` gate delegates to. A skill like that cannot be registered.
+- **`protected-paths`** consults the same declared list, so a path carried under
+  an unusual key is still subject to the amendment rule.
 
 ## 4. History is append-only and tamper-evident
 

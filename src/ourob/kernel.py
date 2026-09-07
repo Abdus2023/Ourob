@@ -107,6 +107,10 @@ class Kernel:
     def _mutating_map(self) -> dict[str, bool]:
         return {name: self.registry.get(name).spec.mutating for name in self.registry.names()}
 
+    def _param_map(self) -> dict[str, dict[str, Any]]:
+        """Declared parameter schemas, so policies confine what skills say they carry."""
+        return {name: dict(self.registry.get(name).spec.params) for name in self.registry.names()}
+
     def _skill_context(self, run_id: str, step: int) -> SkillContext:
         # The services dict is shared with the kernel on purpose: a skill such as
         # ``propose_amendment`` publishes the paths it has just authorised by
@@ -240,6 +244,7 @@ class Kernel:
                 budget_limit=run.max_steps,
                 services={
                     "mutating_skills": self._mutating_map(),
+                    "skill_params": self._param_map(),
                     "ledger": self.ledger,
                     "amended_paths": list(self.services.get("amended_paths") or []),
                 },
