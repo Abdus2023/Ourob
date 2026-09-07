@@ -40,7 +40,9 @@ jobs:
         run: python bootstrap.py verify
 
       - name: test suite in parallel
-        run: python -m pytest -n auto
+        # -n logical, not -n auto: with psutil importable, xdist resolves "auto"
+        # to the *physical* core count and silently runs a single worker.
+        run: python -m pytest -n logical
 
       - name: a self-engineering run, end to end
         run: python bootstrap.py run plans/healthcheck.json

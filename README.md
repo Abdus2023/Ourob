@@ -215,13 +215,22 @@ naming protected files separately, so a ratification record is readable.
 
 ```bash
 python -m pytest            # the runtime's specification
-python -m pytest -n auto    # in parallel (pip install -e '.[dev]')
+python -m pytest -n logical # in parallel (pip install -e '.[dev]')
 ```
 
-The `tests` gate parallelises the same way. `[verify].parallel` is `-1` (one
-worker per CPU when `pytest-xdist` is installed, serial when it is not), `0`
-(serial), or a fixed count. It probes the interpreter it is about to run pytest
-under, so a machine without the dev extra degrades to serial rather than failing.
+Use `-n logical`, not `-n auto`. `auto` asks xdist how many workers to start and
+xdist answers with `psutil.cpu_count(logical=False)` whenever psutil happens to
+be importable — *physical* cores. On a two-vCPU guest that reports one physical
+core, `auto` means one worker and the suite is no faster than serial. Measured
+here: `-n auto` 78s, `-n 2` 42s, three runs of each, every time.
+
+The `tests` gate sidesteps the question by counting for itself with
+`sched_getaffinity` and passing an explicit `-n`, which also respects cgroup and
+affinity limits that `os.cpu_count` ignores. It probes the interpreter it is
+about to run pytest under and degrades to serial when `pytest-xdist` is not
+importable, because a machine without the dev extra must still be able to verify
+the tree. `[verify].parallel` pins it: `-1` count the CPUs, `0` serial, `N`
+exactly N. The verdict names which it used.
 
 `.github/workflows/ci.yml` adds nothing of its own: it installs the toolchain and
 runs `bootstrap.py --prove --strict`, `bootstrap.py verify`, the suite in

@@ -11,6 +11,7 @@ accepted".  Nothing is promoted without it being green.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -365,6 +366,24 @@ class TestGate(Gate):
     blocking = True
     why = "The tests are the runtime's specification; they must pass after self-modification."
 
+    @staticmethod
+    def _cpu_count() -> int:
+        """Usable CPUs, not "auto".
+
+        ``-n auto`` is not trustworthy: xdist resolves it through
+        ``psutil.cpu_count(logical=False)`` when psutil happens to be
+        importable, which counts *physical cores*. On a two-vCPU guest that
+        reports one physical core, "auto" means one worker and the suite runs
+        no faster than serial -- measured at ~78s against ~42s for an explicit
+        ``-n 2``. ``sched_getaffinity`` counts the CPUs this process may
+        actually use, which is the number that matters, and it also respects
+        cgroup and affinity limits that ``os.cpu_count`` ignores.
+        """
+        try:
+            return max(1, len(os.sched_getaffinity(0)))
+        except (AttributeError, OSError):
+            return max(1, os.cpu_count() or 1)
+
     def _worker_args(self, ctx: GateContext) -> list[str]:
         """``-n`` for pytest-xdist, if the config wants it and xdist is there.
 
@@ -379,7 +398,7 @@ class TestGate(Gate):
         rc, _ = ctx.subprocess([ctx.python, "-c", "import xdist"], timeout=30)
         if rc != 0:
             return []
-        return ["-n", "auto" if want < 0 else str(want)]
+        return ["-n", str(self._cpu_count() if want < 0 else want)]
 
     def check(self, ctx: GateContext) -> GateResult:
         started = time.time()

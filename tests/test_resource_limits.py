@@ -103,40 +103,56 @@ def test_the_child_runs_in_its_own_process_group(repo: Path) -> None:
     assert "True" in result.output
 
 
-def test_killing_the_group_takes_grandchildren_with_it(repo: Path) -> None:
+def test_killing_the_group_stops_grandchildren_doing_work(repo: Path) -> None:
+    """A grandchild must stop working when its group is killed.
+
+    Probed by a heartbeat file rather than by ``os.kill(pid, 0)``: under load a
+    killed-but-unreaped grandchild is a zombie that still answers ``kill(pid,
+    0)``, and a recycled pid can answer for a process that was never ours. Both
+    made the obvious version of this test flaky. Counting heartbeats tests the
+    property that actually matters -- the grandchild stopped doing work.
+    """
+    heartbeat = repo / "heartbeat.txt"
     proc = subprocess.Popen(
         [
             sys.executable,
             "-s",
             "-c",
-            "import os, time, sys\n"
-            "pid = os.fork()\n"
-            "if pid == 0:\n"
-            "    time.sleep(60); os._exit(0)\n"
-            "print(pid, flush=True)\n"
+            "import os, time\n"
+            "if os.fork() == 0:\n"
+            "    n = 0\n"
+            "    while True:\n"
+            "        n += 1\n"
+            "        with open('heartbeat.txt', 'w') as f:\n"
+            "            f.write(str(n))\n"
+            "        time.sleep(0.02)\n"
             "time.sleep(60)\n",
         ],
-        stdout=subprocess.PIPE,
+        cwd=repo,
+        stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        text=True,
         start_new_session=True,
     )
     try:
-        grandchild = int(proc.stdout.readline().strip())
-        os.kill(grandchild, 0)  # alive before the kill
+        deadline = time.time() + 10
+        while not heartbeat.exists() and time.time() < deadline:
+            time.sleep(0.02)
+        assert heartbeat.exists(), "the grandchild never started"
+
+        before = int(heartbeat.read_text(encoding="utf-8"))
+        time.sleep(0.3)
+        growing = int(heartbeat.read_text(encoding="utf-8"))
+        assert growing > before, "the heartbeat was not advancing before the kill"
 
         _kill_group(proc)
         os.waitpid(proc.pid, 0)
 
-        deadline = time.time() + 5
-        while time.time() < deadline:
-            try:
-                os.kill(grandchild, 0)
-            except ProcessLookupError:
-                break
-            time.sleep(0.05)
-        else:
-            raise AssertionError("the grandchild outlived the kill of its process group")
+        time.sleep(0.5)
+        after = int(heartbeat.read_text(encoding="utf-8"))
+        time.sleep(0.5)
+        assert int(heartbeat.read_text(encoding="utf-8")) == after, (
+            "the grandchild kept writing after its process group was killed"
+        )
     finally:
         if proc.poll() is None:
             _kill_group(proc)

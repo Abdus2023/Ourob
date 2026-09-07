@@ -1,9 +1,9 @@
 {
   "format": "ourob.bootstrap.lock/v1",
-  "version": 17,
-  "created_at": "2026-09-07T13:18:46Z",
-  "notes": "sandbox the child processes: setrlimit ceilings applied before exec, own session so a timeout reaps the whole tree; tests gate gains pytest-xdist; add CI that runs the repository's own verification",
-  "digest": "7aa0984d4adde50dc85eca0e0d335cbd17ee77d045144c0a2cb12af6793cc19e",
+  "version": 18,
+  "created_at": "2026-09-07T13:58:02Z",
+  "notes": "tests gate: count CPUs with sched_getaffinity and pass an explicit -n, because xdist 'auto' resolves to physical cores and silently runs one worker",
+  "digest": "d291d922d088765aa2f0e7c613de0ff79f98ae7a104ca38c357e4b633166dd0e",
   "files": [
     {
       "path": ".coverage",
@@ -13,8 +13,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "sha256": "cbd694bb493191180a8fa1a6036c303f32081d974e49e6dff90b8ab7dc42e32a",
-      "size": 1491,
+      "sha256": "4cc484657c16650f790f9dc15b08ee8a13df12e4a9f2bb0f218fd813609a6dfa",
+      "size": 1649,
       "protected": false
     },
     {
@@ -25,8 +25,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "c02847d842c63ad95368e03fa00f71f4bcd787ab5558c3eeea038b449da9c6d9",
-      "size": 11070,
+      "sha256": "eb66149356d1008532209a29d593e45e5c2178adb62c76d89d7f751892599bc0",
+      "size": 11645,
       "protected": false
     },
     {
@@ -283,8 +283,8 @@
     },
     {
       "path": "src/ourob/verify/gates.py",
-      "sha256": "4e072430a45a97c024fe6cbcc4ed4b762c9182041da5f485a0bb2daf4b56003d",
-      "size": 16944,
+      "sha256": "7b24e30850983f848b3265ac63cdf0ad3cfbb80cbc51999c6bb97882edffc246",
+      "size": 17805,
       "protected": true
     },
     {
@@ -355,8 +355,8 @@
     },
     {
       "path": "tests/test_resource_limits.py",
-      "sha256": "90b568d24ff00c97feea3337d374412e5970ea5ac42bafe86b5e5123cbe3d744",
-      "size": 7140,
+      "sha256": "e7b4aeda469cce191a61fefae4c0feea225dfe0b8db797af78e385231167d245",
+      "size": 8018,
       "protected": false
     },
     {
@@ -391,8 +391,8 @@
     },
     {
       "path": "tests/test_verify.py",
-      "sha256": "3fb49042e70c471672d3998f149dc855807427b50b89f4db2e02b0146ac67e0e",
-      "size": 15994,
+      "sha256": "f60c68716624a6bfe7e566e879501dc3f4a0ed81e5e92b7456a7d1e25b637a03",
+      "size": 16182,
       "protected": false
     }
   ]

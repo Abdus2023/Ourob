@@ -398,7 +398,11 @@ def test_the_tests_gate_asks_for_workers_when_xdist_is_present(repo: Path) -> No
     ctx = gate_ctx(repo)
     args = gate._worker_args(ctx)
     if ctx.subprocess([ctx.python, "-c", "import xdist"], timeout=30)[0] == 0:
-        assert args == ["-n", "auto"], "parallel=-1 must mean one worker per CPU"
+        assert args == ["-n", str(TestGate._cpu_count())], (
+            "parallel=-1 must pin an explicit worker count; xdist's 'auto' "
+            "resolves through psutil's *physical* core count and silently "
+            "collapses to one worker on a VM"
+        )
     else:
         assert args == [], "without xdist the gate must degrade to serial, not fail"
 
