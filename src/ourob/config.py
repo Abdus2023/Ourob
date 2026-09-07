@@ -46,6 +46,40 @@ class VerifyConfig:
     ])
     timeout: int = 600
     blocking_gates: list[str] = field(default_factory=lambda: ["lint"])
+    #: Workers for the tests gate. ``-1`` means "one per CPU when pytest-xdist
+    #: is installed, serial otherwise"; ``0`` forces serial; ``N`` pins N.
+    parallel: int = -1
+
+
+@dataclass
+class ResourceLimits:
+    """Caps applied to every child process the execution skills start.
+
+    A wall-clock timeout is not enough. Generated code can exhaust memory long
+    before the timeout fires, write a file that fills the disk, or fork. These
+    are enforced with ``setrlimit`` in the child, before it execs, so the code
+    never gets a chance to raise them.
+
+    ``0`` means "do not set this limit". The defaults are deliberately generous
+    -- they exist to stop a runaway, not to constrain normal work.
+    """
+
+    address_space_mb: int = 2048
+    file_size_mb: int = 256
+    cpu_seconds: int = 0
+    processes: int = 0
+
+    def describe(self) -> str:
+        parts = []
+        if self.address_space_mb:
+            parts.append(f"{self.address_space_mb}MB address space")
+        if self.file_size_mb:
+            parts.append(f"{self.file_size_mb}MB per file")
+        if self.cpu_seconds:
+            parts.append(f"{self.cpu_seconds}s cpu")
+        if self.processes:
+            parts.append(f"{self.processes} processes")
+        return ", ".join(parts) or "none"
 
 
 @dataclass
@@ -67,6 +101,7 @@ class PolicyConfig:
             "mypy",
         ]
     )
+    limits: ResourceLimits = field(default_factory=ResourceLimits)
     deny_patterns: list[str] = field(
         default_factory=lambda: [
             "rm -rf",
@@ -111,6 +146,8 @@ class Config:
             config.verify.gates = [str(g) for g in verify["gates"]]
         if "timeout" in verify:
             config.verify.timeout = int(verify["timeout"])
+        if "parallel" in verify:
+            config.verify.parallel = int(verify["parallel"])
         config.verify.blocking_gates = [str(g) for g in verify.get("blocking_gates", [])]
 
         policy = data.get("policy", {})
@@ -131,6 +168,9 @@ class Config:
             config.policy.allow_commands = [str(c) for c in policy["allow_commands"]]
         if "deny_patterns" in policy:
             config.policy.deny_patterns = [str(p) for p in policy["deny_patterns"]]
+        for key, value in (policy.get("limits") or {}).items():
+            if hasattr(config.policy.limits, key):
+                setattr(config.policy.limits, key, int(value))
         return config
 
     @classmethod

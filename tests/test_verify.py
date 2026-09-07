@@ -391,3 +391,27 @@ def test_format_report_marks_every_state(repo: Path) -> None:
     assert "traceback here" in text
     assert "advisory" in text
     assert report.summary_line().startswith("2/4 gates passed")
+
+
+def test_the_tests_gate_asks_for_workers_when_xdist_is_present(repo: Path) -> None:
+    gate = TestGate()
+    ctx = gate_ctx(repo)
+    args = gate._worker_args(ctx)
+    if ctx.subprocess([ctx.python, "-c", "import xdist"], timeout=30)[0] == 0:
+        assert args == ["-n", "auto"], "parallel=-1 must mean one worker per CPU"
+    else:
+        assert args == [], "without xdist the gate must degrade to serial, not fail"
+
+
+def test_the_tests_gate_can_be_pinned_to_serial(repo: Path) -> None:
+    ctx = gate_ctx(repo)
+    ctx.config.verify.parallel = 0
+    assert TestGate()._worker_args(ctx) == []
+
+
+def test_the_tests_gate_reports_the_worker_count(repo: Path) -> None:
+    ctx = gate_ctx(repo)
+    ctx.config.verify.parallel = 0
+    result = TestGate().run(ctx)
+    assert result.passed, result.details
+    assert "serial workers" in result.summary

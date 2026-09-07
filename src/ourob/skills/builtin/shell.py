@@ -13,12 +13,16 @@ stripped environment and a hard timeout:
 
 from __future__ import annotations
 
+import contextlib
 import os
+import signal
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ...config import ResourceLimits
 from ...errors import SkillError
 from ...state.model import SkillResult
 from ..base import Skill, SkillContext, skill
@@ -41,22 +45,92 @@ def _child_env(repo: Path) -> dict[str, str]:
     return env
 
 
-def _run(argv: list[str], repo: Path, timeout: int, stdin: str = "") -> tuple[int, str, str]:
+def _limit_preexec(limits: ResourceLimits | None) -> Callable[[], None] | None:
+    """Build the pre-exec hook that caps the child before it runs any code.
+
+    Runs after fork and before exec, so the child can never raise its own
+    ceiling. ``start_new_session`` puts it in its own process group, which is
+    what makes the timeout able to kill the whole tree rather than just the
+    direct child -- otherwise a grandchild outlives the timeout.
+
+    ``preexec_fn`` is unsafe in a multithreaded program; this runtime forks
+    children from a single-threaded kernel loop, so the caveat does not bite.
+    """
+    if limits is None:
+        return None
     try:
-        proc = subprocess.run(
+        import resource  # noqa: PLC0415  (POSIX only)
+    except ImportError:
+        return None
+
+    wanted: list[tuple[int, int]] = []
+    if limits.address_space_mb > 0:
+        wanted.append((resource.RLIMIT_AS, limits.address_space_mb * 1024 * 1024))
+    if limits.file_size_mb > 0:
+        wanted.append((resource.RLIMIT_FSIZE, limits.file_size_mb * 1024 * 1024))
+    if limits.cpu_seconds > 0:
+        wanted.append((resource.RLIMIT_CPU, limits.cpu_seconds))
+    if limits.processes > 0:
+        wanted.append((resource.RLIMIT_NPROC, limits.processes))
+    wanted.append((resource.RLIMIT_CORE, 0))
+    if not wanted:
+        return None
+
+    def apply() -> None:
+        for what, value in wanted:
+            _, hard = resource.getrlimit(what)
+            ceiling = value if hard == resource.RLIM_INFINITY else min(hard, value)
+            resource.setrlimit(what, (ceiling, ceiling))
+
+    return apply
+
+
+def _kill_group(proc: subprocess.Popen[str]) -> None:
+    """Kill the child's whole process group, not just the direct child."""
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(proc.pid, signal.SIGKILL)
+    with contextlib.suppress(OSError):
+        proc.kill()
+
+
+def _run(
+    argv: list[str],
+    repo: Path,
+    timeout: int,
+    stdin: str = "",
+    limits: ResourceLimits | None = None,
+) -> tuple[int, str, str]:
+    try:
+        proc = subprocess.Popen(
             argv,
             cwd=repo,
-            input=stdin,
-            capture_output=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,
             env=_child_env(repo),
+            preexec_fn=_limit_preexec(limits),
+            start_new_session=True,
         )
-    except subprocess.TimeoutExpired:
-        return 124, "", f"timed out after {timeout}s"
     except FileNotFoundError:
         return 127, "", f"executable not found: {argv[0]!r}"
-    return proc.returncode, proc.stdout, proc.stderr
+    except OSError as exc:
+        return 126, "", f"could not start {argv[0]!r}: {exc}"
+    try:
+        out, err = proc.communicate(input=stdin, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill_group(proc)
+        try:
+            out, err = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            out, err = "", ""
+        return 124, out, f"timed out after {timeout}s"
+    return proc.returncode, out, err
+
+
+def _limits(ctx: SkillContext) -> ResourceLimits | None:
+    config = ctx.services.get("config")
+    return getattr(getattr(config, "policy", None), "limits", None)
 
 
 def _bundle(stdout: str, stderr: str) -> str:
@@ -111,12 +185,19 @@ class RunCommand(Skill):
                     raise SkillError(
                         f"shell metacharacter {token!r} is not permitted in argv ({arg!r})"
                     )
-        rc, out, err = _run(argv, ctx.repo, int(kwargs.get("timeout", 300)))
+        rc, out, err = _run(
+            argv, ctx.repo, int(kwargs.get("timeout", 300)), limits=_limits(ctx)
+        )
         text = _bundle(out, err)
         return SkillResult(
             ok=rc == 0,
             output=text or f"(exit {rc}, no output)",
-            data={"argv": argv, "exit_code": rc, "timed_out": rc == 124},
+            data={
+                "argv": argv,
+                "exit_code": rc,
+                "timed_out": rc == 124,
+                "limits": _limits(ctx).describe() if _limits(ctx) else "none",
+            },
             error=None if rc == 0 else f"exit code {rc}",
         )
 
@@ -146,11 +227,17 @@ class RunPython(Skill):
             ctx.repo,
             int(kwargs.get("timeout", 120)),
             stdin=kwargs.get("stdin", ""),
+            limits=_limits(ctx),
         )
         text = _bundle(out, err)
         return SkillResult(
             ok=rc == 0,
             output=text or f"(exit {rc}, no output)",
-            data={"exit_code": rc, "chars": len(code), "timed_out": rc == 124},
+            data={
+                "exit_code": rc,
+                "chars": len(code),
+                "timed_out": rc == 124,
+                "limits": _limits(ctx).describe() if _limits(ctx) else "none",
+            },
             error=None if rc == 0 else f"exit code {rc}",
         )

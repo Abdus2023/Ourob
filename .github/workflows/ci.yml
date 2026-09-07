@@ -1,0 +1,50 @@
+name: ci
+
+# The point of this file is deliberately small. The verification machinery lives
+# in the repository -- bootstrap.py and the eight gates -- so CI's job is to run
+# it from a bare checkout with no install step and let it judge itself. Nothing
+# here duplicates a gate.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: install the toolchain (the runtime itself needs nothing)
+        run: python -m pip install --upgrade pip ruff pytest pytest-xdist httpx
+
+      - name: cold start from a bare checkout
+        # Proves the tree needs no install step, and that nothing protected has
+        # drifted from bootstrap.lock.json. This is the step that fails if a
+        # change touched guardrails without a ratified amendment.
+        run: python bootstrap.py --prove --strict
+
+      - name: verification suite
+        run: python bootstrap.py verify
+
+      - name: test suite in parallel
+        run: python -m pytest -n auto
+
+      - name: a self-engineering run, end to end
+        run: python bootstrap.py run plans/healthcheck.json
+
+      - name: the runtime's own view of the diff that run made
+        if: always()
+        run: python bootstrap.py runs || true

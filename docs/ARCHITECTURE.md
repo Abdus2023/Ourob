@@ -128,6 +128,21 @@ Relatedly, `[verify].blocking_gates` can escalate an advisory gate to blocking,
 but nothing can demote a gate that is blocking in code. Configuration can make
 the runtime stricter. It cannot make it laxer.
 
+## Why the child process is capped before it execs
+
+`run_command` and `run_python` execute code the planner produced. A wall-clock
+timeout bounds how *long* that can take and nothing else. The children are
+therefore forked with a pre-exec hook that calls `setrlimit` — address space,
+per-file size, optionally CPU seconds and process count — which runs after the
+fork and before the exec, so the child never has the chance to raise its own
+ceiling. `start_new_session` puts it in its own process group, which is what
+lets a timeout reap the whole tree; without it a grandchild outlives the run
+that spawned it and keeps writing after the kernel has declared the step timed
+out.
+
+The limits are deliberately loose (2 GB address space, 256 MB per file). They
+exist to stop a runaway, not to constrain work, and `0` disables any of them.
+
 ## Why skills are discovered rather than declared
 
 `skills/builtin/` is imported as a package; `skills/contrib/` is imported by file

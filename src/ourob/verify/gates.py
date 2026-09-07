@@ -365,6 +365,22 @@ class TestGate(Gate):
     blocking = True
     why = "The tests are the runtime's specification; they must pass after self-modification."
 
+    def _worker_args(self, ctx: GateContext) -> list[str]:
+        """``-n`` for pytest-xdist, if the config wants it and xdist is there.
+
+        Degrades to serial rather than failing: a machine without the dev extra
+        must still be able to verify the tree. The probe uses ``ctx.python``
+        because that is the interpreter pytest will actually run under, which
+        is not necessarily this one.
+        """
+        want = int(getattr(ctx.config.verify, "parallel", 0))
+        if want == 0:
+            return []
+        rc, _ = ctx.subprocess([ctx.python, "-c", "import xdist"], timeout=30)
+        if rc != 0:
+            return []
+        return ["-n", "auto" if want < 0 else str(want)]
+
     def check(self, ctx: GateContext) -> GateResult:
         started = time.time()
         if not (ctx.repo / "tests").is_dir():
@@ -375,10 +391,10 @@ class TestGate(Gate):
             )
         # No -q here: the project's own addopts may already set it, and -qq
         # suppresses the verdict line this gate reports.
-        rc, out = ctx.subprocess(
-            [ctx.python, "-m", "pytest", "--no-header", "-p", "no:cacheprovider", "--tb=short"],
-            timeout=ctx.timeout,
-        )
+        argv = [ctx.python, "-m", "pytest", "--no-header", "-p", "no:cacheprovider", "--tb=short"]
+        workers = self._worker_args(ctx)
+        argv += workers
+        rc, out = ctx.subprocess(argv, timeout=ctx.timeout)
         lines = [line.strip() for line in out.strip().splitlines() if line.strip()]
         tail = "\n".join(lines[-25:])
         # pytest -q ends with a verdict line ("3 passed in 0.4s"); the progress
@@ -387,9 +403,12 @@ class TestGate(Gate):
             (line for line in reversed(lines) if any(w in line for w in ("passed", "failed", "error"))),
             lines[-1] if lines else "no output",
         )
+        label = workers[1] if workers else "serial"
         if rc != 0:
-            return self.result(False, f"pytest exited {rc}: {verdict}", tail, started=started)
-        return self.result(True, verdict, tail, started=started)
+            return self.result(
+                False, f"pytest exited {rc}: {verdict}", tail, started=started
+            )
+        return self.result(True, f"{verdict} [{label} workers]", tail, started=started)
 
 
 class BootstrapGate(Gate):

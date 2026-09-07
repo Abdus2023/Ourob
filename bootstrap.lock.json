@@ -1,14 +1,20 @@
 {
   "format": "ourob.bootstrap.lock/v1",
-  "version": 16,
-  "created_at": "2026-09-07T13:04:12Z",
-  "notes": "config: ourob.toml can add protection but never remove it (union with the floor); gates: policy-integrity checks the declared list so the intent to weaken is still caught",
-  "digest": "55010157490f55ab4416f514f19bcd3354be6dc73b4d821eaaa081d2e38e91fd",
+  "version": 17,
+  "created_at": "2026-09-07T13:18:46Z",
+  "notes": "sandbox the child processes: setrlimit ceilings applied before exec, own session so a timeout reaps the whole tree; tests gate gains pytest-xdist; add CI that runs the repository's own verification",
+  "digest": "7aa0984d4adde50dc85eca0e0d335cbd17ee77d045144c0a2cb12af6793cc19e",
   "files": [
     {
       "path": ".coverage",
       "sha256": "6f9984ef22e08cf4b214544d7d4f428b32c6a5214c832c29fb08c58e444fed8f",
       "size": 53248,
+      "protected": false
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "cbd694bb493191180a8fa1a6036c303f32081d974e49e6dff90b8ab7dc42e32a",
+      "size": 1491,
       "protected": false
     },
     {
@@ -19,8 +25,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "08df673029208244658dad29b91d0c2733d39a00c8a3ebed608e76a8f81c95b1",
-      "size": 9554,
+      "sha256": "c02847d842c63ad95368e03fa00f71f4bcd787ab5558c3eeea038b449da9c6d9",
+      "size": 11070,
       "protected": false
     },
     {
@@ -31,8 +37,8 @@
     },
     {
       "path": "docs/ARCHITECTURE.md",
-      "sha256": "ae8e5c68040247fdbc0ee2b2d4289a0d81d584ba4b487c8b83833eba1af4e07b",
-      "size": 8102,
+      "sha256": "ea0b921cfbaa79baaf95a34805696057722e8bf2f7547fd68c03a532f3a6bf39",
+      "size": 8942,
       "protected": false
     },
     {
@@ -73,8 +79,8 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "c5dd883706c3d2ee1cad403bbd778e613a7875770bf318e4e4fd59416b3890e2",
-      "size": 1211,
+      "sha256": "7827729b06676f505e420a8b8d0e98752c5cacc6d0f158e4d79230d3e4f1f8aa",
+      "size": 1245,
       "protected": false
     },
     {
@@ -133,8 +139,8 @@
     },
     {
       "path": "src/ourob/config.py",
-      "sha256": "a8fff26f382adc56a9fc04eca29a1fcc33180fc4028b8f2541029c9b9df6a732",
-      "size": 6109,
+      "sha256": "e6639439c7e84f4cca70aa891063fbe3e21073d74e867e8f5f781c82b576c61e",
+      "size": 7725,
       "protected": false
     },
     {
@@ -229,8 +235,8 @@
     },
     {
       "path": "src/ourob/skills/builtin/shell.py",
-      "sha256": "68f701a354353a36391c88d9b8f299b8fe66ba9ae3f5877e5ba083696a7a8350",
-      "size": 5557,
+      "sha256": "1373348b5e7b7bf507ae51d49d1b7dd3ca652fa8a9d7d1b462ff6da72a1fa538",
+      "size": 8549,
       "protected": false
     },
     {
@@ -277,8 +283,8 @@
     },
     {
       "path": "src/ourob/verify/gates.py",
-      "sha256": "f604c247f19c17ee9d01898270a892d9f1cf543cae2b4b730c4d7fc0df68e502",
-      "size": 16081,
+      "sha256": "4e072430a45a97c024fe6cbcc4ed4b762c9182041da5f485a0bb2daf4b56003d",
+      "size": 16944,
       "protected": true
     },
     {
@@ -348,6 +354,12 @@
       "protected": false
     },
     {
+      "path": "tests/test_resource_limits.py",
+      "sha256": "90b568d24ff00c97feea3337d374412e5970ea5ac42bafe86b5e5123cbe3d744",
+      "size": 7140,
+      "protected": false
+    },
+    {
       "path": "tests/test_review.py",
       "sha256": "de949443e6cde16ec0838127d836892ce005a2aeab145614e28dafc22157ef93",
       "size": 9269,
@@ -379,8 +391,8 @@
     },
     {
       "path": "tests/test_verify.py",
-      "sha256": "d78222c78e739b939752b748576cad66c8097d5c81fa9eb8010a4a36b9900620",
-      "size": 15142,
+      "sha256": "3fb49042e70c471672d3998f149dc855807427b50b89f4db2e02b0146ac67e0e",
+      "size": 15994,
       "protected": false
     }
   ]

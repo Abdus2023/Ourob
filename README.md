@@ -76,6 +76,25 @@ pass — no install step, no restart. That is what makes self-extension mechanic
 
 A half-written contrib skill is quarantined and reported, not fatal.
 
+`run_command` and `run_python` are the dangerous pair, so neither trusts a
+wall-clock timeout on its own. Every child is started in its own session and
+capped with `setrlimit` **after fork, before exec** — address space, per-file
+size, optionally CPU seconds and process count, core dumps always off — so the
+code never gets a chance to raise its own ceiling. The timeout kills the whole
+process group, not just the direct child, so a grandchild cannot outlive the
+run that spawned it:
+
+```toml
+[policy.limits]        # optional; the defaults are already applied
+address_space_mb = 2048
+file_size_mb     = 256
+cpu_seconds      = 0   # 0 = do not set this limit
+processes        = 0
+```
+
+A wall-clock timeout is not a sandbox. Without the ceiling, generated code can
+exhaust memory long before the timeout fires, fill the disk, or fork.
+
 ### 3. Policies
 
 Seven rules, each about one thing, combined deny-wins. Every verdict — including
@@ -196,7 +215,18 @@ naming protected files separately, so a ratification record is readable.
 
 ```bash
 python -m pytest            # the runtime's specification
+python -m pytest -n auto    # in parallel (pip install -e '.[dev]')
 ```
+
+The `tests` gate parallelises the same way. `[verify].parallel` is `-1` (one
+worker per CPU when `pytest-xdist` is installed, serial when it is not), `0`
+(serial), or a fixed count. It probes the interpreter it is about to run pytest
+under, so a machine without the dev extra degrades to serial rather than failing.
+
+`.github/workflows/ci.yml` adds nothing of its own: it installs the toolchain and
+runs `bootstrap.py --prove --strict`, `bootstrap.py verify`, the suite in
+parallel, and a real self-engineering plan. If a change touched guardrails
+without a ratified amendment, CI fails at the cold start.
 
 The suite copies the repository into a temporary directory and lets the runtime
 modify *that*: it adds skills to itself, tampers with its own guardrails, breaks
