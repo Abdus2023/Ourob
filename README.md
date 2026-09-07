@@ -1,0 +1,196 @@
+# ourob
+
+An autonomous-engineering runtime whose **source, skills, policies, state model,
+verification machinery and bootstrap mechanism all live inside the repository it
+is capable of engineering.**
+
+That sentence is the whole design. `ourob` can rewrite `ourob`. What keeps that
+from being reckless is that every self-modification travels the same road as any
+other change: it is proposed by a planner, judged by a policy set, written to a
+tamper-evident journal, and only *accepted* if the repository's own verification
+gates are green afterwards. A change that has not been promoted is drift, and
+drift does not become the runtime.
+
+```
+ourob/
+├── bootstrap.py            root of trust: stdlib-only, verifies the tree, then boots it
+├── bootstrap.lock.json     self-describing manifest: every file that is "the runtime"
+├── ourob.toml              protected config: what may not be touched without an amendment
+├── plans/                  deterministic, reviewable plans
+├── src/ourob/
+│   ├── kernel.py           the loop
+│   ├── skills/             what the runtime can do      (self-extendable)
+│   ├── policies/           what it is allowed to do     (protected)
+│   ├── state/              what it remembers            (append-only, hash-chained)
+│   ├── verify/             how a change is judged       (protected)
+│   ├── bootstrap/          how it rebuilds itself       (protected)
+│   ├── planner/            the only component that decides
+│   └── cli.py
+└── tests/                  the runtime's specification
+```
+
+## Try it
+
+Nothing to install. The bootstrap puts the runtime on `sys.path` itself.
+
+```bash
+python bootstrap.py --prove      # integrity proof for this tree
+python bootstrap.py doctor       # skills, policies, gates, lock, journal health
+python bootstrap.py selftest     # every read-only command, end to end
+python bootstrap.py verify -v    # run the gates
+```
+
+The interesting one: have the runtime add a capability to itself, then verify it.
+
+```bash
+python bootstrap.py run plans/self_extend.json -v
+python bootstrap.py verify -v                       # gates must be green
+python bootstrap.py promote --message "add the rot13 skill"
+python bootstrap.py skills | grep rot13             # it is part of the runtime now
+```
+
+And the one that matters: try to make it break its own rules.
+
+```bash
+python bootstrap.py run plans/refused.json -v
+```
+
+All four attempts — escaping the repository, editing the policy engine, rewriting
+its own journal, running `rm -rf` — are refused before the skill executes, and
+the tree is byte-identical afterwards.
+
+## The seven things
+
+### 1. Source
+
+Ordinary Python under `src/ourob/`, src-layout, no required dependencies.
+Optional `httpx` for the LLM planner.
+
+### 2. Skills
+
+A skill declares a name, a description, a parameter schema and whether it
+mutates the tree. The registry discovers them by **scanning**, not from a table:
+`skills/builtin/` is a package, and anything in `skills/contrib/` is imported by
+file path. A skill the runtime writes during a run is live on the next discovery
+pass — no install step, no restart. That is what makes self-extension mechanical.
+
+A half-written contrib skill is quarantined and reported, not fatal.
+
+### 3. Policies
+
+Eight rules, each about one thing, combined deny-wins. Every verdict — including
+the allows — is journalled.
+
+| policy | what it stops |
+|---|---|
+| `path-confinement` | any path leaving the repository |
+| `protected-paths` | writing the bootstrap, policies, verifier or config without an amendment |
+| `journal-integrity` | writing to the runtime's own history |
+| `budget` | unbounded runs |
+| `payload-size` | absurd writes |
+| `command-allowlist` | commands outside `ourob.toml` |
+| `loop-breaker` | retrying the same failing call forever |
+| `path-key-coverage` | *(advisory)* path-like arguments in keys the confinement policy does not inspect |
+
+### 4. State model
+
+`Run` → `Step` → `Invocation` / `PolicyDecision` / `SkillResult`, persisted as an
+append-only JSONL journal per run. Each line carries the SHA-256 of the line
+before it, plus a `.head` anchor naming the last sequence number and hash, so
+edits, deletions *and* truncation are all detectable. `ourob journal --check`
+verifies every chain; `ourob show <run>` replays a run from its log alone.
+
+### 5. Verification machinery
+
+Eight gates, each answering one question, each running in a subprocess with a
+timeout so a broken tree cannot take the verifier down with it:
+
+| gate | question |
+|---|---|
+| `policy-integrity` | are the guardrails still there? (re-reads the config out of process) |
+| `skill-contract` | does every skill declare a valid, unique, documented schema? |
+| `compile` | does every byte of Python compile? |
+| `import` | does the runtime import cleanly from this tree? |
+| `manifest` | has anything protected drifted without an amendment? |
+| `lint` | is it readable? *(advisory unless escalated in config)* |
+| `tests` | is the specification still satisfied? |
+| `bootstrap` | can the tree cold-start itself? |
+
+`policy-integrity` exists because a single edit to `ourob.toml` could otherwise
+legalise editing `ourob.toml`. `[verify].blocking_gates` can escalate an advisory
+gate; nothing can demote a gate that is blocking in code.
+
+### 6. Bootstrap mechanism
+
+`bootstrap.py` is stdlib-only and does not import `ourob` until it has checked
+the tree against `bootstrap.lock.json`. The verification it performs is an
+independent implementation of the same hash walk the library does — the checker
+and the checked are not the same code. A hard-coded floor protects
+`bootstrap.py` and the lock itself even if `ourob.toml` is edited to protect
+nothing.
+
+### 7. Amendments
+
+Protected paths are not engineering surface; they are the parts that decide what
+engineering is allowed. Changing them is a constitutional act:
+
+```bash
+python bootstrap.py amend src/ourob/policies/ --why "lower the retry threshold"
+# ... a run may now write there ...
+python bootstrap.py ratify amd-20260907-000000-abcd1234 --message "lower MAX_REPEATS"
+```
+
+Ratification requires green gates. If verification fails, the amendment is marked
+rejected and the tree is rolled back to the pre-run snapshot — exactly, including
+files the run invented.
+
+## Commands
+
+```
+doctor      health of the runtime and its repository
+skills      the skill catalogue
+policies    the policy set
+gates       the verification gates
+verify      run the gates
+manifest    inspect or rewrite the bootstrap lock
+run         execute a plan from plans/
+promote     verify a change set and make it the ratified state
+amend       propose or list amendments
+ratify      promote under an amendment
+runs        list recorded runs
+journal     read (or verify) the hash-chained journal
+show        replay a run from its journal
+coldstart   verify the tree and boot from it
+snapshots   list or discard rollback snapshots
+selftest    every read-only command, end to end
+```
+
+## Tests
+
+```bash
+python -m pytest            # the runtime's specification
+```
+
+The suite copies the repository into a temporary directory and lets the runtime
+modify *that*: it adds skills to itself, tampers with its own guardrails, breaks
+its own build, and has each change judged. The real tree is never written to.
+
+## Layout of a change
+
+```
+plan  →  kernel loop  →  policy set  →  journal  →  skill  →  journal
+                                                          ↓
+                                            snapshot (before first mutation)
+                                                          ↓
+                                            verification suite
+                                                     ↙          ↘
+                                            green                red
+                                              ↓                   ↓
+                                     promote: lock++,        rollback,
+                                     git commit,             amendment
+                                     amend ratified          rejected
+```
+
+## License
+
+MIT.

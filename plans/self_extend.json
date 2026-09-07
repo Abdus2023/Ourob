@@ -1,0 +1,47 @@
+{
+  "goal": "Add a rot13 skill to the runtime, with tests, and verify the result",
+  "max_steps": 8,
+  "stop_on_error": true,
+  "steps": [
+    {
+      "skill": "read_manifest",
+      "args": {},
+      "rationale": "record the state the runtime is starting from"
+    },
+    {
+      "skill": "write_file",
+      "args": {
+        "path": "src/ourob/skills/contrib/rot13.py",
+        "content": "\"\"\"A skill the runtime authored itself.\n\nWritten by ``plans/self_extend.json`` to demonstrate that a running ourob can add\na capability to the runtime it is made of, and that the addition is held to the\nsame standard as everything else: it has to lint, compile, import and pass the\ntests before it is accepted.\n\"\"\"\n\nfrom typing import Any\n\nfrom ourob.skills.base import Skill, SkillContext, skill\nfrom ourob.state.model import SkillResult\n\nALPHABET = \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"\nROTATED = \"nopqrstuvwxyzabcdefghijklmNOPQRSTUVWXYZABCDEFGHIJKLM\"\nTABLE = str.maketrans(ALPHABET, ROTATED)\n\n\n@skill(\n    \"rot13\",\n    title=\"ROT13\",\n    description=\"Rotate the ASCII letters of a string by thirteen places. Self-authored skill.\",\n    params={\"text\": {\"type\": \"str\", \"required\": True, \"desc\": \"text to rotate\"}},\n)\nclass Rot13(Skill):\n    \"\"\"ROT13 cipher, added by the runtime to itself.\"\"\"\n\n    def run(self, ctx: SkillContext, **kwargs: Any) -> SkillResult:\n        text = str(kwargs[\"text\"])\n        return SkillResult(ok=True, output=text.translate(TABLE), data={\"length\": len(text)})\n"
+      },
+      "rationale": "contrib skills are discovered by path, so writing the file is the whole install step"
+    },
+    {
+      "skill": "write_file",
+      "args": {
+        "path": "tests/test_contrib_rot13.py",
+        "content": "\"\"\"Tests for the self-authored rot13 skill.\"\"\"\n\nfrom pathlib import Path\n\nfrom ourob.skills.base import SkillContext\nfrom ourob.skills.registry import SkillRegistry\nfrom ourob.state.model import Invocation\n\nREPO = Path(__file__).resolve().parents[1]\n\n\ndef _registry() -> SkillRegistry:\n    registry = SkillRegistry(REPO)\n    registry.discover()\n    return registry\n\n\ndef _rot13(text: str) -> str:\n    ctx = SkillContext(repo=REPO, services={})\n    result = _registry().dispatch(Invocation(skill=\"rot13\", args={\"text\": text}), ctx)\n    assert result.ok, result.error\n    return result.output\n\n\ndef test_rot13_is_discovered_without_an_install_step() -> None:\n    assert _registry().has(\"rot13\")\n\n\ndef test_rot13_rotates() -> None:\n    assert _rot13(\"Hello\") == \"Uryyb\"\n\n\ndef test_rot13_is_its_own_inverse() -> None:\n    assert _rot13(_rot13(\"ourob\")) == \"ourob\"\n\n\ndef test_rot13_leaves_non_letters_alone() -> None:\n    assert _rot13(\"123 !\") == \"123 !\"\n"
+      },
+      "rationale": "a capability without a test is a rumour"
+    },
+    {
+      "skill": "list_skills",
+      "args": {
+        "pattern": "rot13"
+      },
+      "rationale": "confirm the new skill is live without a restart"
+    },
+    {
+      "skill": "run_verification",
+      "args": {},
+      "rationale": "the tree must pass every gate before this is considered done"
+    },
+    {
+      "skill": "finish",
+      "args": {
+        "summary": "Added the rot13 skill under skills/contrib with tests; verification green.",
+        "success": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,357 @@
+{
+  "format": "ourob.bootstrap.lock/v1",
+  "version": 8,
+  "created_at": "2026-09-07T07:14:31Z",
+  "notes": "self-extension: rot13 skill authored by the runtime; bootstrap argv passthrough fix; state-independent kernel tests",
+  "digest": "e3c8d19f75bc2215de50ed66219027be20c4e5a6d79ac362cd42ede803fe4bef",
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "2b0bbb329fadd3271ead2446c1341afd42655620acf112dbc3781fa86ef272cc",
+      "size": 71,
+      "protected": false
+    },
+    {
+      "path": "README.md",
+      "sha256": "ccb78b3abe2d00fc79944cdcc5f70e184a59b1f4a9e11ddfcf013f236decd3f2",
+      "size": 8186,
+      "protected": false
+    },
+    {
+      "path": "bootstrap.py",
+      "sha256": "410e5ff8d82f2beb69803a77a9d4bc369a27aab7ce73945f20537c94822a5d17",
+      "size": 10670,
+      "protected": true
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "sha256": "1bc560f8a33bb6c1833ac19be59b48b70065e1192bb6227639f1bca332432e84",
+      "size": 6755,
+      "protected": false
+    },
+    {
+      "path": "docs/CONSTITUTION.md",
+      "sha256": "c8f61b985881130dbfae34ac322e261fca62564b6f39289061842dc25c7f2557",
+      "size": 4824,
+      "protected": false
+    },
+    {
+      "path": "ourob.toml",
+      "sha256": "2ea65c695a5981c5106957d1eefb4eeeb249ae2de260717cca7ea587628ab1a6",
+      "size": 1215,
+      "protected": true
+    },
+    {
+      "path": "plans/amend_policy.json",
+      "sha256": "bc8fa881ed88a2a23eb839970274144c6763e53fcbc7dfec43d0e4b421c6a10f",
+      "size": 1133,
+      "protected": false
+    },
+    {
+      "path": "plans/healthcheck.json",
+      "sha256": "df7e82020b0e5a75f846ba1a45ccf66c36c20796eb0ce4346eb27eed725f55b8",
+      "size": 773,
+      "protected": false
+    },
+    {
+      "path": "plans/refused.json",
+      "sha256": "583c46383bc7ac5cca915638cfb2367b41810d89ca96dcc3cad1443c4f0fc6f2",
+      "size": 1079,
+      "protected": false
+    },
+    {
+      "path": "plans/self_extend.json",
+      "sha256": "26d1c50186b50cd8efd5628e15c89b2d6b35574ac82c31da7e43985d5e491bc9",
+      "size": 3404,
+      "protected": false
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "c5dd883706c3d2ee1cad403bbd778e613a7875770bf318e4e4fd59416b3890e2",
+      "size": 1211,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/__init__.py",
+      "sha256": "9a2862e8c82ca1fc79aba9001c10bf13b39c31254ad26d9e33d4319a38b295a8",
+      "size": 1054,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/bootstrap/__init__.py",
+      "sha256": "e404db3b9dda58b7503621c8854f5865de96dba5d5789fb97eee385806c6a883",
+      "size": 687,
+      "protected": true
+    },
+    {
+      "path": "src/ourob/bootstrap/amend.py",
+      "sha256": "ea98473cf9c21fa4df2f4767e691d82f83c7db22f30dae41cb69efa8f846be53",
+      "size": 6054,
+      "protected": true
+    },
+    {
+      "path": "src/ourob/bootstrap/coldstart.py",
+      "sha256": "93cacd267c2cd7477a01251b61ff7cd96f275cb3b4e9ef4e66663a9c83b7f113",
+      "size": 6049,
+      "protected": true
+    },
+    {
+      "path": "src/ourob/bootstrap/manifest.py",
+      "sha256": "78a5691b51c98c6b7e9d98b889680b1a5ce0fb26e61e198a05573d5671663a82",
+      "size": 7030,
+      "protected": true
+    },
+    {
+      "path": "src/ourob/bootstrap/promote.py",
+      "sha256": "cc0bfa97149c7f07374993fa5cc246ffe3cf16819664b1d585b926e1981576c9",
+      "size": 10341,
+      "protected": true
+    },
+    {
+      "path": "src/ourob/bootstrap/snapshot.py",
+      "sha256": "4e59e83f8409475df6452485e493276e05ba85ae0d8a4f94d3cc8e12b2bd8482",
+      "size": 6059,
+      "protected": true
+    },
+    {
+      "path": "src/ourob/cli.py",
+      "sha256": "c5d70ccc1c84d2f8939e6b3c33655aebaf4c92a31a6a3e2c09564823b47d6845",
+      "size": 18680,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/clock.py",
+      "sha256": "4ed6d6dddd1f897ea439f7d08420733f8c5429b12d6b12be485ae06567497b48",
+      "size": 438,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/config.py",
+      "sha256": "5ce2992be950f7fca6bf8a2ad2390aa050c6c16fe232e8145deb0a7eb498e86f",
+      "size": 4193,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/errors.py",
+      "sha256": "4a5f6ac748b459635926641dad32ca23b0bacf2e092a33c9831c9869a3a8be32",
+      "size": 1657,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/fsx.py",
+      "sha256": "f665f615c263a9ff54486e2996f99dfa5a26e24e9512576519dff97fde3c8bdb",
+      "size": 3939,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/kernel.py",
+      "sha256": "6674024c91d6a27961d7dcf2cf0d56cbb106e1b6610b56ed945df1e5c1be7ab3",
+      "size": 12869,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/planner/__init__.py",
+      "sha256": "88cac8222dde723c98c77c8ce48068ea6c23156be878bbf9cc4d9764681b671e",
+      "size": 294,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/planner/base.py",
+      "sha256": "e9a1f13643a3d71cf0aec6c720be2eaa6ed49f3c7825cd2632e9154240a3cebd",
+      "size": 3071,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/planner/llm.py",
+      "sha256": "2a20c106a18f1e5791363ea9b5602bd8c3b28962cca3dd828d83c9bb52bce49a",
+      "size": 5671,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/planner/scripted.py",
+      "sha256": "86f5977bdc15c5e70a58c4022b74e637f2f62a669803d0c955334b501ba8e0d8",
+      "size": 3878,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/policies/__init__.py",
+      "sha256": "20a448b93f340edeb18664efc13cdecd83e6f3ad76d54b3abf23e97298981dff",
+      "size": 878,
+      "protected": true
+    },
+    {
+      "path": "src/ourob/policies/base.py",
+      "sha256": "71534fb27b5121dd1fcca067d1b1ba437ef17472d80456ae0bb96f7654ce8e1b",
+      "size": 5903,
+      "protected": true
+    },
+    {
+      "path": "src/ourob/policies/rules.py",
+      "sha256": "cd37f19dc9ac4803ba1574c2f440ddfb1cbdfd509ed6230ee63615cfb20b45a4",
+      "size": 9403,
+      "protected": true
+    },
+    {
+      "path": "src/ourob/schema.py",
+      "sha256": "b0a8909c891c4d3ba18f05064eb3985234a066dd289b23ad44df44cc22c7e1ca",
+      "size": 4356,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/skills/__init__.py",
+      "sha256": "8165e0321821c51cccc0d35f135d868dfd0263b1f40da1083e21c4f1bd66c2ab",
+      "size": 349,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/skills/base.py",
+      "sha256": "36ab184c409a74a9a1a304ae3a7e50669b3cf521defde236223719545a37938f",
+      "size": 4376,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/skills/builtin/__init__.py",
+      "sha256": "3daa0f7029c5b577c63590fb245f2be3ac42bfb9a00394ed313cb7331f05619b",
+      "size": 48,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/skills/builtin/files.py",
+      "sha256": "6310f17719d5c597875ceb1caa128f1da9c91caee3342b78456f6589b8e33576",
+      "size": 8991,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/skills/builtin/shell.py",
+      "sha256": "68f701a354353a36391c88d9b8f299b8fe66ba9ae3f5877e5ba083696a7a8350",
+      "size": 5557,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/skills/builtin/verification.py",
+      "sha256": "4811efd744e80f89996414959753030e5f290218dfe69332f74e5d2b2570096f",
+      "size": 7931,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/skills/contrib/rot13.py",
+      "sha256": "086d4ddce9ea5640ea72cdcf0070910a43342edc653d83721aa5bd1dbda8db89",
+      "size": 1109,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/skills/registry.py",
+      "sha256": "5871722a4019f33ca21e2b28ff39e2494192674d7f98405fee9d86b29feb3711",
+      "size": 6217,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/state/__init__.py",
+      "sha256": "77f59886bb5f9f27c337ce892d745a8ae9d249f62541284c81484035ae8dc378",
+      "size": 582,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/state/model.py",
+      "sha256": "e077e10bbc2e63df7f6e4bc6aad67805d5202a2f07c6b159868b335e4884bc28",
+      "size": 8979,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/state/store.py",
+      "sha256": "17f66b02a3dabd7d75df6c1eae370475e2f21de58329d380a269d2ece5b1151b",
+      "size": 13088,
+      "protected": false
+    },
+    {
+      "path": "src/ourob/verify/__init__.py",
+      "sha256": "984ff1d971e25edc7f55ac98c51b9d2d64192a61bfee9738112427f853d0a7fc",
+      "size": 817,
+      "protected": true
+    },
+    {
+      "path": "src/ourob/verify/gates.py",
+      "sha256": "e8b37ed8d1ff0ea26f7dd4982876c074ca4cbd999a17c2fb33090dd1e4f88bf3",
+      "size": 15124,
+      "protected": true
+    },
+    {
+      "path": "src/ourob/verify/suite.py",
+      "sha256": "9fbcc527ac20ad4bb22281b039a7a83fad87a00f3c7a7edaabc7a987f6a4e717",
+      "size": 4544,
+      "protected": true
+    },
+    {
+      "path": "tests/conftest.py",
+      "sha256": "282679baaa0124943144e587b5ed697918925e5d2fe36991cf2db2da2b9b03b4",
+      "size": 2168,
+      "protected": false
+    },
+    {
+      "path": "tests/test_bootstrap.py",
+      "sha256": "3d36e52dadcdfc7ea82898840a3cce699eee2968ee161a9c9818a4e219326998",
+      "size": 17275,
+      "protected": false
+    },
+    {
+      "path": "tests/test_cli.py",
+      "sha256": "4d3956f6625cc749d9d2e50c466fabdad6791977ce84a122efd138e73ce7f9a9",
+      "size": 9870,
+      "protected": false
+    },
+    {
+      "path": "tests/test_contrib_rot13.py",
+      "sha256": "b2d12aa3562e4dd3681dc09d491e602a9d659f2e53ee69acb24d2b2f91dbc384",
+      "size": 951,
+      "protected": false
+    },
+    {
+      "path": "tests/test_fsx.py",
+      "sha256": "0c56cd7464086b018f2f3f78fa4912b5bab9499279ab3083000acef901032138",
+      "size": 4035,
+      "protected": false
+    },
+    {
+      "path": "tests/test_kernel.py",
+      "sha256": "2389e12b77c0942e16f8cbc610ad88891d1c3fe55363e3d808e02972dafc1908",
+      "size": 16796,
+      "protected": false
+    },
+    {
+      "path": "tests/test_manifest.py",
+      "sha256": "7d05cabe34fda7fdf113e111c11c775baf834bd0f9fa359cfcff09f3315b30ba",
+      "size": 4525,
+      "protected": false
+    },
+    {
+      "path": "tests/test_policies.py",
+      "sha256": "43e8fc5055a6a5f03793cec1b3d8dbb9d4c533c06d38dda28179c21354b357c2",
+      "size": 9661,
+      "protected": false
+    },
+    {
+      "path": "tests/test_schema.py",
+      "sha256": "9cf6097a7e8596267ab4fda7fdff5195b5e5a34975dbc2b6fcbb7619b8b840e9",
+      "size": 2127,
+      "protected": false
+    },
+    {
+      "path": "tests/test_skills.py",
+      "sha256": "1c89b5d115ebab20ae976ab6f19460c9994508abae583033d5ad8fc594cf7791",
+      "size": 15800,
+      "protected": false
+    },
+    {
+      "path": "tests/test_state.py",
+      "sha256": "dfe4cfe7bcad5fef42f2579f6b47e066dbbf3f49a9051c93d0af3ecfe8dc61e8",
+      "size": 6278,
+      "protected": false
+    },
+    {
+      "path": "tests/test_verify.py",
+      "sha256": "0d2ca119e72416eb4517edcd176587581fe15f20ee3ccff29cab269e861c6103",
+      "size": 9807,
+      "protected": false
+    }
+  ]
+}

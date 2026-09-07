@@ -1,0 +1,35 @@
+{
+  "goal": "Inspect the runtime without changing anything",
+  "max_steps": 8,
+  "steps": [
+    {
+      "skill": "read_manifest",
+      "args": {},
+      "rationale": "what do I consist of?"
+    },
+    {
+      "skill": "list_skills",
+      "args": {},
+      "rationale": "what can I do?"
+    },
+    {
+      "skill": "run_python",
+      "args": {
+        "code": "from ourob.policies.rules import default_policy_set; print(', '.join(default_policy_set().names()))"
+      },
+      "rationale": "what am I not allowed to do?"
+    },
+    {
+      "skill": "run_verification",
+      "args": {},
+      "rationale": "am I still healthy?"
+    },
+    {
+      "skill": "finish",
+      "args": {
+        "summary": "Health check complete.",
+        "success": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+# ourob runtime configuration.
+#
+# This file is PROTECTED. Writing to it requires a ratified amendment, because
+# it is where the runtime is told what it may not touch. See docs/CONSTITUTION.md.
+
+[runtime]
+name = "ourob"
+description = "autonomous-engineering runtime, self-hosted in this repository"
+
+[policy]
+# Paths the runtime may not modify without a ratified amendment.
+protected = [
+    "ourob.toml",
+    "bootstrap.py",
+    "bootstrap.lock.json",
+    "src/ourob/bootstrap/",
+    "src/ourob/policies/",
+    "src/ourob/verify/",
+]
+max_steps = 24
+max_file_bytes = 1000000
+
+allow_commands = [
+    "python",
+    "python3",
+    "pytest",
+    "git status",
+    "git diff",
+    "git log",
+    "git add",
+    "git commit",
+    "ruff",
+    "mypy",
+]
+
+deny_patterns = [
+    "rm -rf",
+    "sudo ",
+    "curl",
+    "wget",
+    "nc ",
+    "ssh ",
+    ":(){",
+    "chmod -R",
+    "chown ",
+    "> /dev/",
+]
+
+[verify]
+gates = [
+    "policy-integrity",
+    "skill-contract",
+    "compile",
+    "import",
+    "manifest",
+    "lint",
+    "tests",
+    "bootstrap",
+]
+timeout = 900
+# Advisory gates that must be treated as blocking. A gate already declared
+# blocking in code can never be demoted here.
+blocking_gates = ["lint"]
