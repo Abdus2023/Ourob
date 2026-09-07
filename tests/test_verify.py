@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ourob.config import Config
+import pytest
+
+from ourob.config import DEFAULT_PROTECTED, Config
+from ourob.errors import ConfigError
 from ourob.state.model import VerificationReport
 from ourob.state.store import StateStore
 from ourob.verify.gates import (
@@ -89,6 +92,38 @@ def test_policy_integrity_fails_when_guardrails_are_weakened(repo: Path) -> None
     result = PolicyIntegrityGate().run(gate_ctx(repo))
     assert not result.passed
     assert "weakened" in result.summary
+
+
+def test_the_gate_reads_the_declared_list_not_the_effective_one(repo: Path) -> None:
+    """The union makes a narrowing edit ineffective, not invisible.
+
+    A person who edits ourob.toml to drop src/ourob/policies/ must be told so,
+    even though the runtime would still refuse the write.
+    """
+    (repo / "ourob.toml").write_text('[policy]\nprotected = ["ourob.toml"]\n', encoding="utf-8")
+    assert Config.load(repo).is_protected("src/ourob/policies/rules.py")  # floor holds
+
+    result = PolicyIntegrityGate().run(gate_ctx(repo))
+    assert not result.passed
+    assert "no longer declares" in result.summary
+    assert "src/ourob/policies/" in result.summary
+
+
+def test_an_unreadable_config_fails_before_the_gates_ever_run(repo: Path) -> None:
+    """A config that will not parse is caught by Config.load, not by this gate.
+
+    ``declared_protected`` still returns an empty list rather than raising, so
+    that the gate fails closed if it is ever reached directly.
+    """
+    (repo / "ourob.toml").write_text("[policy\nthis is not toml\n", encoding="utf-8")
+
+    with pytest.raises(ConfigError):
+        Config.load(repo)  # what verify_repo does before any gate runs
+    assert Config.declared_protected(repo) == []
+
+
+def test_declared_protected_reports_the_floor_when_the_file_is_absent(tmp_path: Path) -> None:
+    assert Config.declared_protected(tmp_path) == list(DEFAULT_PROTECTED)
 
 
 def test_skill_contract_passes_on_the_shipped_runtime(repo: Path) -> None:

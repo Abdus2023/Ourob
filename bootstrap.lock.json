@@ -1,9 +1,9 @@
 {
   "format": "ourob.bootstrap.lock/v1",
-  "version": 15,
-  "created_at": "2026-09-07T07:57:30Z",
-  "notes": "docs: document ourob diff and the human-reviewable promotion record",
-  "digest": "98475de657d07abddb49b77acbe93a62853413e2c34e7333e75f68dc43426154",
+  "version": 16,
+  "created_at": "2026-09-07T13:04:12Z",
+  "notes": "config: ourob.toml can add protection but never remove it (union with the floor); gates: policy-integrity checks the declared list so the intent to weaken is still caught",
+  "digest": "55010157490f55ab4416f514f19bcd3354be6dc73b4d821eaaa081d2e38e91fd",
   "files": [
     {
       "path": ".coverage",
@@ -133,8 +133,8 @@
     },
     {
       "path": "src/ourob/config.py",
-      "sha256": "5ce2992be950f7fca6bf8a2ad2390aa050c6c16fe232e8145deb0a7eb498e86f",
-      "size": 4193,
+      "sha256": "a8fff26f382adc56a9fc04eca29a1fcc33180fc4028b8f2541029c9b9df6a732",
+      "size": 6109,
       "protected": false
     },
     {
@@ -277,8 +277,8 @@
     },
     {
       "path": "src/ourob/verify/gates.py",
-      "sha256": "5b296e4b8cafe6e5f5c8d689efacf8806622f1a4ef126b9e747e605ee1157e76",
-      "size": 15539,
+      "sha256": "f604c247f19c17ee9d01898270a892d9f1cf543cae2b4b730c4d7fc0df68e502",
+      "size": 16081,
       "protected": true
     },
     {
@@ -303,6 +303,12 @@
       "path": "tests/test_cli.py",
       "sha256": "93e20b33b081bda88aa9a880739fada70a7584512e721ad9cd738f1a6172f1b1",
       "size": 11138,
+      "protected": false
+    },
+    {
+      "path": "tests/test_config.py",
+      "sha256": "977ca70dad745b7d8f41890c91b3c7ad1f5b7307b0a3a85bb01e696e35ac0dcf",
+      "size": 3387,
       "protected": false
     },
     {
@@ -355,8 +361,8 @@
     },
     {
       "path": "tests/test_schema.py",
-      "sha256": "e9443dbe98b0fccd6ba2a39463f5d9a0be877884447e6d2e12dab81cd1d48a43",
-      "size": 3671,
+      "sha256": "cd60155f32bf1505cfc77b7a29b8182da168a6c81d94eab89432012e2baa7ec5",
+      "size": 3672,
       "protected": false
     },
     {
@@ -373,8 +379,8 @@
     },
     {
       "path": "tests/test_verify.py",
-      "sha256": "480f64e73db8074e121426e4991a00e985f5b3324cfc0c49ef144c3bdfdf4955",
-      "size": 13667,
+      "sha256": "d78222c78e739b939752b748576cad66c8097d5c81fa9eb8010a4a36b9900620",
+      "size": 15142,
       "protected": false
     }
   ]

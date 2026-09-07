@@ -105,3 +105,4 @@ def test_coerce_raises_on_invalid_calls() -> None:
 
 def test_none_is_treated_as_absent() -> None:
     assert coerce({"path": "a", "count": None}, SPEC)["count"] == 3
+

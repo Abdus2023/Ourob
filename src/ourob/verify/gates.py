@@ -113,7 +113,12 @@ class PolicyIntegrityGate(Gate):
     name = "policy-integrity"
     title = "Guardrails are intact"
     blocking = True
-    why = "The protected-path set must still cover the bootstrap, policies and verifier."
+    why = (
+        "ourob.toml must still declare the bootstrap, policies and verifier as protected. "
+        "Config.load unions the file with DEFAULT_PROTECTED so a narrowing edit cannot take "
+        "effect at runtime; this gate exists so the edit is still refused rather than silently "
+        "ignored."
+    )
 
     REQUIRED_COVERAGE = (
         "bootstrap.py",
@@ -127,8 +132,9 @@ class PolicyIntegrityGate(Gate):
             "import json,sys;"
             f"sys.path.insert(0,{str(ctx.repo / 'src')!r});"
             "from ourob.config import Config;"
+            f"d=Config.declared_protected({str(ctx.repo)!r});"
             f"c=Config.load({str(ctx.repo)!r});"
-            "print(json.dumps({'protected':c.policy.protected,'source':c.source}))"
+            "print(json.dumps({'protected':d,'effective':c.policy.protected,'source':c.source}))"
         )
         rc, out = ctx.subprocess([ctx.python, "-c", code], timeout=60)
         if rc != 0:
@@ -149,13 +155,16 @@ class PolicyIntegrityGate(Gate):
         if missing:
             return self.result(
                 False,
-                f"guardrails weakened: {', '.join(missing)} no longer protected",
+                "guardrails weakened: ourob.toml no longer declares "
+                f"{', '.join(missing)} as protected. The runtime floor still refuses "
+                "those writes, but the config must not claim otherwise.",
                 json.dumps(data, indent=2),
                 started=started,
             )
         return self.result(
             True,
-            f"{len(protected)} protected paths, all required coverage present",
+            f"{len(protected)} declared protected paths, all required coverage present "
+            f"({len(data.get('effective', []))} effective after the floor)",
             json.dumps(data, indent=2),
             started=started,
         )
