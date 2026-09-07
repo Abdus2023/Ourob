@@ -89,6 +89,16 @@ Running a plan leaves **drift**. Drift is not a version of the runtime. Only
    rejected, leaving the repository byte-identical to how it started;
 5. on success — rewrite the lock, commit, ratify the amendment.
 
+### Promotion is meant to be read
+
+`PromotionResult` carries the manifest diff, and `describe()` lists every file it
+is about to commit, with protected paths named separately. `ourob diff <run>`
+renders the same change as a unified diff: the file set is re-derived from the
+journaled `skill.result` events (each skill reports the artifacts it touched),
+and the pre-run side is the snapshot the kernel took before the first mutating
+step. Three views of one change — the journal, the diff, the rollback baseline —
+that are deliberately not allowed to disagree.
+
 The snapshot is taken by the kernel *before the first mutating step* and is
 deliberately not git. Git is a good place to record a ratified change; rollback
 has to work in a bare checkout with no history, and it has to be exact about

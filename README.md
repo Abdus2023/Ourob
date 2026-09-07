@@ -164,12 +164,33 @@ promote     verify a change set and make it the ratified state
 amend       propose or list amendments
 ratify      promote under an amendment
 runs        list recorded runs
+diff        what a recorded run actually changed, as a real diff
 journal     read (or verify) the hash-chained journal
 show        replay a run from its journal
 coldstart   verify the tree and boot from it
 snapshots   list, roll back to, or discard a snapshot
 selftest    every read-only command, end to end
 ```
+
+## Reviewing a change
+
+A gate can tell you a change is *sound*. It cannot show it to you.
+
+```bash
+ourob diff <run-id>            # unified diff, pre-run snapshot vs. the tree now
+ourob diff <run-id> --stat     # just the files, and what happened to each
+```
+
+The file list is not a scan of the tree — it is re-derived from the journal, from
+the artifacts each skill said it touched. The pre-run side comes from the
+snapshot the kernel took before the first mutating step, which is the same
+snapshot `snapshots --rollback` restores from. So the diff you read, the record
+of the run, and the thing rollback would undo are all the same artifact.
+
+Every file is classified `added`, `modified`, `deleted`, `unchanged` (the change
+was rolled back), `vanished` (absent before *and* after — it cancelled out) or
+`unbaselined` (a read-only run took no snapshot). Promotion prints the same list,
+naming protected files separately, so a ratification record is readable.
 
 ## Tests
 
