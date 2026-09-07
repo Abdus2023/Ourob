@@ -25,7 +25,15 @@ from ourob.verify.suite import VerificationSuite, format_report, verify_repo
 
 
 def gate_ctx(repo: Path, **extra) -> GateContext:
+    """Build a gate context; ``amended_paths`` becomes a real amendment object."""
+    from ourob.bootstrap.amend import Amendment
+
     config = Config.load(repo)
+    paths = extra.pop("amended_paths", None)
+    if paths:
+        extra["amendments"] = [
+            Amendment(amendment_id="amd-test", paths=list(paths), rationale="test authorisation")
+        ]
     return GateContext(
         repo=repo,
         config=config,
@@ -175,10 +183,23 @@ def test_manifest_gate_fails_on_unamended_protected_drift(repo: Path) -> None:
 
 def test_manifest_gate_accepts_amended_protected_drift(repo: Path) -> None:
     (repo / "src" / "ourob" / "policies" / "rules.py").write_text("# amended\n", encoding="utf-8")
-    result = ManifestGate().run(
-        gate_ctx(repo, amended_paths=["src/ourob/policies/rules.py"])
-    )
+    result = ManifestGate().run(gate_ctx(repo, amended_paths=["src/ourob/policies/rules.py"]))
     assert result.passed, result.summary
+
+
+def test_manifest_gate_honours_a_directory_pattern_amendment(repo: Path) -> None:
+    """An amendment for a protected directory covers the files under it."""
+    (repo / "src" / "ourob" / "policies" / "rules.py").write_text("# amended\n", encoding="utf-8")
+    result = ManifestGate().run(gate_ctx(repo, amended_paths=["src/ourob/policies/"]))
+    assert result.passed, result.summary
+    assert "amendments considered" in result.details
+
+
+def test_manifest_gate_rejects_an_amendment_for_a_different_path(repo: Path) -> None:
+    (repo / "src" / "ourob" / "policies" / "rules.py").write_text("# amended\n", encoding="utf-8")
+    result = ManifestGate().run(gate_ctx(repo, amended_paths=["ourob.toml"]))
+    assert not result.passed
+    assert "src/ourob/policies/rules.py" in result.summary
 
 
 def test_lint_skips_when_ruff_is_absent(repo: Path) -> None:

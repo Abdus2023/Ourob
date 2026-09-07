@@ -43,6 +43,31 @@ class VerificationSuite:
         self.gate_names = gates if gates is not None else list(self.config.verify.gates)
         self.amended_paths = list(amended_paths or [])
 
+    def amendments(self) -> list[Any]:
+        """Amendments that authorise protected drift during this verification.
+
+        Two sources, merged: the paths handed in for this session (a run that
+        proposed an amendment mid-flight) and whatever active amendments are
+        already on file.  Both are resolved with :meth:`Amendment.covers`, so a
+        directory pattern covers the files under it -- the same matcher the
+        ``protected-paths`` policy uses.
+        """
+        from ..bootstrap.amend import Amendment, AmendmentLedger
+
+        out: list[Any] = []
+        if self.amended_paths:
+            out.append(
+                Amendment(
+                    amendment_id=f"session:{self.run_id or 'verify'}",
+                    paths=list(self.amended_paths),
+                    rationale="authorised for this verification",
+                )
+            )
+        # AmendmentLedger.all() already skips documents it cannot parse, so an
+        # unreadable amendment simply fails to authorise anything -- fail closed.
+        out.extend(AmendmentLedger(self.repo / ".ourob" / "amendments").active())
+        return out
+
     def context(self) -> GateContext:
         return GateContext(
             repo=self.repo,
@@ -50,7 +75,7 @@ class VerificationSuite:
             timeout=self.config.verify.timeout,
             run_id=self.run_id,
             state=self.state,
-            extra={"amended_paths": self.amended_paths},
+            extra={"amendments": self.amendments()},
         )
 
     def gates(self) -> list[Gate]:

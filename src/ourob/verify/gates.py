@@ -270,8 +270,10 @@ class ManifestGate(Gate):
     """Compare the tree against ``bootstrap.lock.json``.
 
     Drift on ordinary paths is expected while engineering and is reported, not
-    failed.  Drift on a *protected* path fails unless the caller has attached an
-    active amendment authorising exactly those paths.
+    failed.  Drift on a *protected* path fails unless an amendment covers it.
+    Coverage is decided by :meth:`Amendment.covers` -- the same matcher the
+    ``protected-paths`` policy uses -- so a directory-pattern amendment covers
+    the files underneath it.
     """
 
     name = "manifest"
@@ -293,9 +295,18 @@ class ManifestGate(Gate):
             )
         manifest = Manifest.load(ctx.repo)
         diff = compare(manifest, ctx.repo)
-        amended = set(ctx.extra.get("amended_paths") or [])
-        violations = [p for p in diff.touched if ctx.config.is_protected(p) and p not in amended]
+        amendments = list(ctx.extra.get("amendments") or [])
+        violations = [
+            path
+            for path in diff.touched
+            if ctx.config.is_protected(path)
+            and not any(a.covers(path) for a in amendments)
+        ]
         detail = json.dumps(diff.to_dict(), indent=2)
+        if amendments:
+            detail += "\namendments considered:\n" + "\n".join(
+                f"  {a.amendment_id} [{a.status}] {', '.join(a.paths)}" for a in amendments
+            )
         if violations:
             return self.result(
                 False,
