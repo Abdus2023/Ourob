@@ -1,45 +1,45 @@
 {
-  "goal": "Add a rot13 skill to the runtime, with tests, and verify the result",
+  "goal": "Add a genuinely new text_metrics skill, test it in a fresh process, and verify the result",
   "max_steps": 8,
   "stop_on_error": true,
   "steps": [
     {
       "skill": "read_manifest",
       "args": {},
-      "rationale": "record the state the runtime is starting from"
+      "rationale": "record the starting lock before extension"
     },
     {
       "skill": "write_file",
       "args": {
-        "path": "src/ourob/skills/contrib/rot13.py",
-        "content": "\"\"\"A skill the runtime authored itself.\n\nWritten by ``plans/self_extend.json`` to demonstrate that a running ourob can add\na capability to the runtime it is made of, and that the addition is held to the\nsame standard as everything else: it has to lint, compile, import and pass the\ntests before it is accepted.\n\"\"\"\n\nfrom typing import Any\n\nfrom ourob.skills.base import Skill, SkillContext, skill\nfrom ourob.state.model import SkillResult\n\nALPHABET = \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"\nROTATED = \"nopqrstuvwxyzabcdefghijklmNOPQRSTUVWXYZABCDEFGHIJKLM\"\nTABLE = str.maketrans(ALPHABET, ROTATED)\n\n\n@skill(\n    \"rot13\",\n    title=\"ROT13\",\n    description=\"Rotate the ASCII letters of a string by thirteen places. Self-authored skill.\",\n    params={\"text\": {\"type\": \"str\", \"required\": True, \"desc\": \"text to rotate\"}},\n)\nclass Rot13(Skill):\n    \"\"\"ROT13 cipher, added by the runtime to itself.\"\"\"\n\n    def run(self, ctx: SkillContext, **kwargs: Any) -> SkillResult:\n        text = str(kwargs[\"text\"])\n        return SkillResult(ok=True, output=text.translate(TABLE), data={\"length\": len(text)})\n"
+        "path": "src/ourob/skills/contrib/text_metrics.py",
+        "content": "\"\"\"A small deterministic text-metrics skill authored during self-extension.\"\"\"\n\nfrom typing import Any\n\nfrom ourob.skills.base import Skill, SkillContext, skill\nfrom ourob.state.model import SkillResult\n\n\n@skill(\n    \"text_metrics\",\n    title=\"Text metrics\",\n    description=\"Count characters, whitespace-delimited words, and lines in text.\",\n    params={\"text\": {\"type\": \"str\", \"required\": True, \"desc\": \"text to measure\"}},\n)\nclass TextMetrics(Skill):\n    def run(self, ctx: SkillContext, **kwargs: Any) -> SkillResult:\n        text = str(kwargs[\"text\"])\n        data = {\"characters\": len(text), \"words\": len(text.split()), \"lines\": len(text.splitlines())}\n        return SkillResult(\n            ok=True,\n            output=f\"{data['words']} words, {data['lines']} lines\",\n            data=data,\n        )\n"
       },
-      "rationale": "contrib skills are discovered by path, so writing the file is the whole install step"
+      "rationale": "text_metrics is absent from the initial discovery snapshot and is a genuinely new target"
     },
     {
       "skill": "write_file",
       "args": {
-        "path": "tests/test_contrib_rot13.py",
-        "content": "\"\"\"Tests for the self-authored rot13 skill.\"\"\"\n\nfrom pathlib import Path\n\nfrom ourob.skills.base import SkillContext\nfrom ourob.skills.registry import SkillRegistry\nfrom ourob.state.model import Invocation\n\nREPO = Path(__file__).resolve().parents[1]\n\n\ndef _registry() -> SkillRegistry:\n    registry = SkillRegistry(REPO)\n    registry.discover()\n    return registry\n\n\ndef _rot13(text: str) -> str:\n    ctx = SkillContext(repo=REPO, services={})\n    result = _registry().dispatch(Invocation(skill=\"rot13\", args={\"text\": text}), ctx)\n    assert result.ok, result.error\n    return result.output\n\n\ndef test_rot13_is_discovered_without_an_install_step() -> None:\n    assert _registry().has(\"rot13\")\n\n\ndef test_rot13_rotates() -> None:\n    assert _rot13(\"Hello\") == \"Uryyb\"\n\n\ndef test_rot13_is_its_own_inverse() -> None:\n    assert _rot13(_rot13(\"ourob\")) == \"ourob\"\n\n\ndef test_rot13_leaves_non_letters_alone() -> None:\n    assert _rot13(\"123 !\") == \"123 !\"\n"
+        "path": "tests/test_contrib_text_metrics.py",
+        "content": "\"\"\"Regression tests for the newly authored text_metrics skill.\"\"\"\n\nfrom pathlib import Path\n\nfrom ourob.skills.base import SkillContext\nfrom ourob.skills.registry import SkillRegistry\nfrom ourob.state.model import Invocation\n\nREPO = Path(__file__).resolve().parents[1]\n\n\ndef _registry() -> SkillRegistry:\n    registry = SkillRegistry(REPO)\n    registry.discover()\n    return registry\n\n\ndef test_text_metrics_is_discovered_by_a_fresh_registry() -> None:\n    assert _registry().has(\"text_metrics\")\n\n\ndef test_text_metrics_counts_deterministically() -> None:\n    registry = _registry()\n    context = SkillContext(repo=REPO, services={})\n    result = registry.dispatch(\n        Invocation(skill=\"text_metrics\", args={\"text\": \"one two\\nthree\"}), context\n    )\n    assert result.ok, result.error\n    assert result.data == {\"characters\": 13, \"words\": 3, \"lines\": 2}\n    assert result.output == \"3 words, 2 lines\"\n\n\ndef test_text_metrics_handles_empty_text() -> None:\n    registry = _registry()\n    context = SkillContext(repo=REPO, services={})\n    result = registry.dispatch(Invocation(skill=\"text_metrics\", args={\"text\": \"\"}), context)\n    assert result.ok, result.error\n    assert result.data == {\"characters\": 0, \"words\": 0, \"lines\": 0}\n"
       },
-      "rationale": "a capability without a test is a rumour"
+      "rationale": "the new capability has direct behavioral and fresh-discovery tests"
     },
     {
       "skill": "list_skills",
       "args": {
-        "pattern": "rot13"
+        "pattern": "text_metrics"
       },
-      "rationale": "confirm the new skill is live without a restart"
+      "rationale": "the current runtime must report the new file as pending rather than pretend it hot-loaded"
     },
     {
       "skill": "run_verification",
       "args": {},
-      "rationale": "the tree must pass every gate before this is considered done"
+      "rationale": "verification launches fresh subprocesses that must discover and test the new skill"
     },
     {
       "skill": "finish",
       "args": {
-        "summary": "Added the rot13 skill under skills/contrib with tests; verification green.",
+        "summary": "Authored text_metrics and its tests; current discovery reports it pending, fresh-process tests pass, and promotion remains required.",
         "success": true
       }
     }

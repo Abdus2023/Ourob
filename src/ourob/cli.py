@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__, fsx
-from .bootstrap.amend import AmendmentLedger
+from .bootstrap.amend import AmendmentLedger, _confirmed_operator_action
 from .bootstrap.coldstart import boot
 from .bootstrap.manifest import Manifest, compare
 from .bootstrap.promote import Promotion
@@ -63,9 +63,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         lines.append(f"  lock         {manifest.digest[:16]} ({len(manifest)} files)")
         lines.append(f"  drift        {diff.describe()}")
         violations = [p for p in diff.touched if config.is_protected(p)]
-        lines.append(
-            f"  protected    {'CLEAN' if not violations else 'DRIFT: ' + ', '.join(violations)}"
-        )
+        lines.append(f"  protected    {'CLEAN' if not violations else 'DRIFT: ' + ', '.join(violations)}")
     else:
         lines.append("  lock         MISSING -- run `ourob manifest --rebuild`")
     for problem in problems:
@@ -129,9 +127,7 @@ def cmd_gates(args: argparse.Namespace) -> int:
 def cmd_verify(args: argparse.Namespace) -> int:
     repo = _repo(args)
     gates = args.gates or None
-    outcome = verify_repo(
-        repo, gates=gates, run_id=args.run_id or "", amended_paths=args.amend or []
-    )
+    outcome = verify_repo(repo, gates=gates, run_id=args.run_id or "")
     print(format_report(outcome.report, verbose=args.verbose))
     if outcome.unknown:
         print(f"unknown gate(s) ignored: {', '.join(outcome.unknown)}")
@@ -226,13 +222,8 @@ def cmd_diff(args: argparse.Namespace) -> int:
 
     snapshot_root = repo / ".ourob" / "snapshots" / run.run_id / "tree"
     have_snapshot = snapshot_root.is_dir()
-    print(
-        f"run {run.run_id}  status={run.status.value}  "
-        f"{len(run.touched)} file(s) touched"
-    )
-    print(
-        f"baseline: {'snapshot ' + run.run_id if have_snapshot else 'none (read-only run)'}"
-    )
+    print(f"run {run.run_id}  status={run.status.value}  {len(run.touched)} file(s) touched")
+    print(f"baseline: {'snapshot ' + run.run_id if have_snapshot else 'none (read-only run)'}")
     print()
 
     for relpath in run.touched:
@@ -308,33 +299,76 @@ def cmd_amend(args: argparse.Namespace) -> int:
     repo = _repo(args)
     ledger = AmendmentLedger(repo / ".ourob" / "amendments")
     if args.list:
-        amendments = ledger.all()
-        if not amendments:
+        proposals = ledger.all()
+        if not proposals:
             print("no amendments on file")
             return 0
-        for amendment in amendments:
+        for proposal in proposals:
+            amendment = ledger.authorising_id(proposal.amendment_id) or proposal
             print(amendment.summary())
         return 0
     if args.reject:
         amendment = ledger.set_status(
-            args.reject, "rejected", evidence={"withdrawn_by": args.by or "operator",
-                                               "reason": args.why or "withdrawn"}
+            args.reject,
+            "rejected",
+            evidence={"withdrawn_by": args.by or "operator", "reason": args.why or "withdrawn"},
         )
         print(f"rejected {amendment.amendment_id}")
-        print(f"  it authorised: {', '.join(amendment.paths)}")
+        print(f"  paths:         {', '.join(amendment.paths)}")
         print(f"  reason:        {amendment.evidence.get('reason', '')}")
         print("\nthose paths are protected again.")
         return 0
     if not args.paths:
-        print("usage: ourob amend <path> [<path> ...] --why \"rationale\"", file=sys.stderr)
+        print('usage: ourob amend <path> [<path> ...] --why "rationale"', file=sys.stderr)
         return 2
     amendment = ledger.propose(args.paths, args.why or "", proposed_by=args.by or "operator")
     print(f"proposed {amendment.amendment_id}")
     print(f"  paths     {', '.join(amendment.paths)}")
     print(f"  rationale {amendment.rationale}")
     print(f"  status    {amendment.status}")
-    print("\nwrites to those paths are now permitted during a run.")
-    print(f"promote with `ourob promote --amendment {amendment.amendment_id}` to make it official.")
+    print("\nThis proposal does not authorize writes.")
+    print(
+        f"An operator must separately run `ourob authorize {amendment.amendment_id} --by <identity>`; "
+        "then verify and promote under that grant."
+    )
+    return 0
+
+
+def cmd_authorize(args: argparse.Namespace) -> int:
+    repo = _repo(args)
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    proposal = ledger.load(args.amendment)
+    proposal_sha256 = fsx.sha256_file(ledger._path(args.amendment))
+    if not sys.stdin.isatty():
+        print("authorization requires an interactive operator terminal", file=sys.stderr)
+        return 2
+    print("This is a one-time grant for the exact paths below; it is not a signature or OS boundary.")
+    print(f"proposal    {proposal.amendment_id} [{proposal.status}]")
+    print(f"proposed by {proposal.proposed_by}")
+    print(f"rationale   {proposal.rationale}")
+    print(f"base rev    {proposal.base_revision}")
+    print(f"base digest {proposal.base_digest}")
+    print(f"proposal SHA-256 {proposal_sha256}")
+    print(f"paths       {', '.join(proposal.paths)}")
+    try:
+        confirmation = input(f"Type {proposal.amendment_id} to authorize exactly these paths: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print("authorization cancelled", file=sys.stderr)
+        return 2
+    if confirmation != proposal.amendment_id:
+        print("authorization cancelled: proposal id did not match", file=sys.stderr)
+        return 1
+    with _confirmed_operator_action(args.amendment, confirmation, proposal_sha256):
+        grant = ledger.authorize(
+            args.amendment,
+            confirmation=confirmation,
+            authorized_by=args.by or "operator",
+        )
+    print(f"authorized {grant['amendment_id']} by {grant['authorized_by']}")
+    print(f"  authorization {grant['authorization_id']}")
+    print(f"  base revision  {grant['base_revision']}")
+    print(f"  base digest    {grant['base_digest']}")
+    print(f"  paths          {', '.join(grant['paths'])}")
     return 0
 
 
@@ -503,7 +537,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("verify", help="run the verification suite")
     p.add_argument("--gates", nargs="*", help="subset of gates to run")
-    p.add_argument("--amend", nargs="*", default=[], help="paths covered by an amendment")
     p.add_argument("--run-id", default="", help="tag the report with this run id")
     p.add_argument("-v", "--verbose", action="store_true")
     p.set_defaults(func=cmd_verify)
@@ -523,7 +556,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_run)
 
     p = sub.add_parser("promote", help="verify a change set and make it the new ratified state")
-    p.add_argument("--amendment", default="", help="amendment id authorising protected drift")
+    p.add_argument("--amendment", default="", help="operator-authorized amendment id for protected drift")
     p.add_argument("--message", default="", help="note for the new lock and the commit")
     p.add_argument("--gates", nargs="*", help="subset of gates to run")
     p.add_argument("--snapshot", default="", help="run id whose snapshot to roll back to on failure")
@@ -531,7 +564,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-rollback", action="store_true")
     p.set_defaults(func=cmd_promote)
 
-    p = sub.add_parser("amend", help="propose (or list) constitutional amendments")
+    p = sub.add_parser("amend", help="propose, reject, or list protected-path amendments")
     p.add_argument("paths", nargs="*", help="protected paths to authorise")
     p.add_argument("--why", default="", help="rationale")
     p.add_argument("--by", default="", help="who is proposing")
@@ -539,7 +572,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--reject", default="", metavar="AMENDMENT_ID", help="withdraw an amendment")
     p.set_defaults(func=cmd_amend)
 
-    p = sub.add_parser("ratify", help="promote under an amendment and mark it ratified")
+    p = sub.add_parser("authorize", help="record separate operator authority for a proposal")
+    p.add_argument("amendment", help="proposal id; its revision, digest, and exact paths are pinned")
+    p.add_argument("--by", default="operator", help="operator identity recording the grant")
+    p.set_defaults(func=cmd_authorize)
+
+    p = sub.add_parser("ratify", help="promote under an authorized amendment and mark it ratified")
     p.add_argument("amendment")
     p.add_argument("--message", default="")
     p.add_argument("--snapshot", default="")
@@ -575,9 +613,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--discard", default="", metavar="RUN_ID")
     p.set_defaults(func=cmd_snapshots)
 
-    sub.add_parser("selftest", help="run every read-only command and report").set_defaults(
-        func=cmd_selftest
-    )
+    sub.add_parser("selftest", help="run every read-only command and report").set_defaults(func=cmd_selftest)
     return parser
 
 

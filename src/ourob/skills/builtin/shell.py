@@ -1,28 +1,30 @@
 """Execution skills.
 
-Two ways to run code, both sandboxed to the repository directory with a
-stripped environment and a hard timeout:
+Both child-process skills run with a stripped environment, a hard timeout,
+resource limits, a Linux Landlock write boundary, and a narrow seccomp filter
+for selected ownership/xattr changes. File-mode and timestamp changes are not
+mediated. Children may create or modify file contents and namespace entries
+only in unprotected repository directories and a per-call scratch directory.
+This is not a general OS sandbox; systems without the required controls refuse
+child execution.
 
-``run_command``  an allowlisted shell command (``python``, ``pytest``, ``git
-                 status`` ...).  The allowlist lives in ``ourob.toml`` and the
-                 shell is never invoked -- the command line is split and passed
-                 straight to ``execvp``, so there is nothing to inject into.
-``run_python``   a snippet of Python, run in a child interpreter with
-                 ``PYTHONPATH`` pointing at the repository's own ``src``.
+``run_command``  an allowlisted command (``python``, ``pytest``, ``git status``).
+                 The shell is never invoked; argv goes directly to the executable,
+                 and the child inherits filesystem rules.
+``run_python``   a Python snippet in a child interpreter with ``PYTHONPATH``
+                 pointing at the repository's own ``src`` and the same rules.
 """
 
 from __future__ import annotations
 
-import contextlib
 import os
-import signal
-import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from ...config import ResourceLimits
+from ...child_sandbox import run_child
+from ...config import Config, ResourceLimits
 from ...errors import SkillError
 from ...state.model import SkillResult
 from ..base import Skill, SkillContext, skill
@@ -37,6 +39,7 @@ def _child_env(repo: Path) -> dict[str, str]:
         "PYTHONPATH": str(repo / "src"),
         "PYTHONHASHSEED": "0",
         "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
         "OUROB_REPO": str(repo),
     }
     for key in ("OUROB_API_KEY", "OUROB_MODEL", "OUROB_BASE_URL"):
@@ -85,52 +88,33 @@ def _limit_preexec(limits: ResourceLimits | None) -> Callable[[], None] | None:
     return apply
 
 
-def _kill_group(proc: subprocess.Popen[str]) -> None:
-    """Kill the child's whole process group, not just the direct child."""
-    with contextlib.suppress(ProcessLookupError, PermissionError):
-        os.killpg(proc.pid, signal.SIGKILL)
-    with contextlib.suppress(OSError):
-        proc.kill()
-
-
 def _run(
     argv: list[str],
     repo: Path,
     timeout: int,
+    *,
+    protected: list[str],
     stdin: str = "",
     limits: ResourceLimits | None = None,
 ) -> tuple[int, str, str]:
-    try:
-        proc = subprocess.Popen(
-            argv,
-            cwd=repo,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=_child_env(repo),
-            preexec_fn=_limit_preexec(limits),
-            start_new_session=True,
-        )
-    except FileNotFoundError:
-        return 127, "", f"executable not found: {argv[0]!r}"
-    except OSError as exc:
-        return 126, "", f"could not start {argv[0]!r}: {exc}"
-    try:
-        out, err = proc.communicate(input=stdin, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        _kill_group(proc)
-        try:
-            out, err = proc.communicate(timeout=10)
-        except subprocess.TimeoutExpired:
-            out, err = "", ""
-        return 124, out, f"timed out after {timeout}s"
-    return proc.returncode, out, err
+    return run_child(
+        argv,
+        repo=repo,
+        protected=protected,
+        env=_child_env(repo),
+        timeout=timeout,
+        stdin=stdin,
+        limits=_limit_preexec(limits),
+    )
+
+
+def _config(ctx: SkillContext) -> Config:
+    config = ctx.services.get("config")
+    return config if isinstance(config, Config) else Config.load(ctx.repo)
 
 
 def _limits(ctx: SkillContext) -> ResourceLimits | None:
-    config = ctx.services.get("config")
-    return getattr(getattr(config, "policy", None), "limits", None)
+    return _config(ctx).policy.limits
 
 
 def _bundle(stdout: str, stderr: str) -> str:
@@ -151,8 +135,9 @@ def _bundle(stdout: str, stderr: str) -> str:
     "run_command",
     title="Run an allowlisted command",
     description=(
-        "Run a shell-free command from the allowlist in ourob.toml inside the "
-        "repository. No shell is involved, so arguments cannot escape."
+        "Run an allowlisted command without a shell. Linux Landlock blocks child "
+        "content/namespace writes under protected paths, runtime state, and Git "
+        "metadata; mode/timestamp changes are not confined. Unsupported hosts fail closed."
     ),
     params={
         "argv": {
@@ -162,31 +147,32 @@ def _bundle(stdout: str, stderr: str) -> str:
         },
         "timeout": {"type": "int", "default": 300, "min": 1, "max": 3600},
     },
+    mutating=True,
 )
 class RunCommand(Skill):
     def run(self, ctx: SkillContext, **kwargs: Any) -> SkillResult:
         argv = [str(a) for a in kwargs["argv"]]
         if not argv:
             raise SkillError("argv must not be empty")
-        config = ctx.services.get("config")
-        allowed = list(getattr(config.policy, "allow_commands", [])) if config else []
-        denied = list(getattr(config.policy, "deny_patterns", [])) if config else []
+        config = _config(ctx)
+        allowed = list(config.policy.allow_commands)
+        denied = list(config.policy.deny_patterns)
         joined = " ".join(argv)
         for pattern in denied:
             if pattern and pattern in joined:
                 raise SkillError(f"command matches deny pattern {pattern!r}")
         if allowed and not any(joined == a or joined.startswith(a + " ") for a in allowed):
-            raise SkillError(
-                f"{argv[0]!r} is not on the allowlist; permitted prefixes: {', '.join(allowed)}"
-            )
+            raise SkillError(f"{argv[0]!r} is not on the allowlist; permitted prefixes: {', '.join(allowed)}")
         for arg in argv:
             for token in (";", "&&", "||", "|", "`", "$(", ">", "<", "\n"):
                 if token in arg:
-                    raise SkillError(
-                        f"shell metacharacter {token!r} is not permitted in argv ({arg!r})"
-                    )
+                    raise SkillError(f"shell metacharacter {token!r} is not permitted in argv ({arg!r})")
         rc, out, err = _run(
-            argv, ctx.repo, int(kwargs.get("timeout", 300)), limits=_limits(ctx)
+            argv,
+            ctx.repo,
+            int(kwargs.get("timeout", 300)),
+            protected=list(config.policy.protected),
+            limits=_limits(ctx),
         )
         text = _bundle(out, err)
         return SkillResult(
@@ -197,6 +183,10 @@ class RunCommand(Skill):
                 "exit_code": rc,
                 "timed_out": rc == 124,
                 "limits": _limits(ctx).describe() if _limits(ctx) else "none",
+                "filesystem_boundary": (
+                    "Landlock content/namespace writes plus selected seccomp "
+                    "ownership/xattr denial; mode/time changes not confined"
+                ),
             },
             error=None if rc == 0 else f"exit code {rc}",
         )
@@ -206,9 +196,9 @@ class RunCommand(Skill):
     "run_python",
     title="Run Python",
     description=(
-        "Execute a Python snippet in a child interpreter with the repository's own "
-        "src on PYTHONPATH and the user site disabled. Returns stdout, stderr and "
-        "the exit code."
+        "Execute a Python snippet in a child interpreter. Landlock restricts child "
+        "content/namespace writes to unprotected repository directories and a scratch "
+        "tree; mode/timestamp changes are not confined. Unsupported hosts refuse execution."
     ),
     params={
         "code": {"type": "str", "required": True, "desc": "Python source to execute"},
@@ -222,10 +212,12 @@ class RunPython(Skill):
         code: str = kwargs["code"]
         if not code.strip():
             raise SkillError("code must not be empty")
+        config = _config(ctx)
         rc, out, err = _run(
             [sys.executable, "-s", "-c", code],
             ctx.repo,
             int(kwargs.get("timeout", 120)),
+            protected=list(config.policy.protected),
             stdin=kwargs.get("stdin", ""),
             limits=_limits(ctx),
         )
@@ -238,6 +230,10 @@ class RunPython(Skill):
                 "chars": len(code),
                 "timed_out": rc == 124,
                 "limits": _limits(ctx).describe() if _limits(ctx) else "none",
+                "filesystem_boundary": (
+                    "Landlock content/namespace writes plus selected seccomp "
+                    "ownership/xattr denial; mode/time changes not confined"
+                ),
             },
             error=None if rc == 0 else f"exit code {rc}",
         )

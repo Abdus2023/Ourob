@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .bootstrap.amend import AmendmentLedger
+from .bootstrap.amend import AmendmentLedger, runtime_execution
 from .bootstrap.manifest import Manifest, compare
 from .bootstrap.snapshot import Snapshot
 from .config import Config
@@ -55,9 +55,7 @@ class RunOutcome:
 
     @property
     def ok(self) -> bool:
-        return self.run.status is RunStatus.COMPLETED and (
-            self.report is None or self.report.passed
-        )
+        return self.run.status is RunStatus.COMPLETED and (self.report is None or self.report.passed)
 
     def summary(self) -> str:
         lines = [
@@ -96,11 +94,15 @@ class Kernel:
         if self.registry is None:
             self.registry = SkillRegistry(self.repo)
         self.registry.discover()
+        self.registry.freeze()
         if self.policies is None:
             from .policies.rules import default_policy_set
 
             self.policies = default_policy_set()
         self.ledger = self.ledger or AmendmentLedger(self.repo / ".ourob" / "amendments")
+        # Authorization is not a runtime skill capability, even if a caller
+        # accidentally supplied a ledger in its generic service dictionary.
+        self.services.pop("ledger", None)
 
     # -- plumbing ---------------------------------------------------------
     def _log(self, message: str) -> None:
@@ -115,13 +117,11 @@ class Kernel:
         return {name: dict(self.registry.get(name).spec.params) for name in self.registry.names()}
 
     def _skill_context(self, run_id: str, step: int) -> SkillContext:
-        # The services dict is shared with the kernel on purpose: a skill such as
-        # ``propose_amendment`` publishes the paths it has just authorised by
-        # writing to it, and the policy layer reads that on the next invocation.
+        # The services dict carries the registry and config to skills. No
+        # authorization service is exposed; proposal files never confer authority,
+        # and the policy layer independently validates operator grants.
         self.services.setdefault("config", self.config)
         self.services.setdefault("registry", self.registry)
-        self.services.setdefault("ledger", self.ledger)
-        self.services.setdefault("amended_paths", [])
         return SkillContext(
             repo=self.repo,
             run_id=run_id,
@@ -138,14 +138,18 @@ class Kernel:
             step_index=run.step_count,
             budget_remaining=max(0, run.max_steps - run.step_count),
             skills=self.registry.catalogue(),
+            skill_discovery=self.registry.discovery_status(),
             history=list(self.observations),
             policies=self.policies.catalogue(),
             protected_paths=self.config.protected_prefixes(),
-            amended_paths=list(self.services.get("amended_paths") or []),
         )
 
     # -- the loop ---------------------------------------------------------
     def run(self, goal: str, planner: Planner, *, max_steps: int | None = None) -> RunOutcome:
+        with runtime_execution():
+            return self._run_inside_runtime(goal, planner, max_steps=max_steps)
+
+    def _run_inside_runtime(self, goal: str, planner: Planner, *, max_steps: int | None = None) -> RunOutcome:
         self.observations = []
         run = self.state.open_run(
             goal, max_steps=max_steps or self.config.policy.max_steps, planner=planner.name
@@ -157,6 +161,7 @@ class Kernel:
                 "skills": self.registry.names(),
                 "policies": self.policies.names(),
                 "discovery_problems": self.registry.problems(),
+                "skill_discovery": self.registry.discovery_status(),
                 "lock_digest": self._lock_digest(),
             },
         )
@@ -191,9 +196,7 @@ class Kernel:
             step.result = result
             run.record_artifacts(result.artifacts)
             step.status = StepStatus.OK if result.ok else StepStatus.ERROR
-            self.state.record(
-                run.run_id, "skill.result", {"index": step.index, "result": result.to_dict()}
-            )
+            self.state.record(run.run_id, "skill.result", {"index": step.index, "result": result.to_dict()})
             self._log(
                 f"step {step.index}: {invocation.skill} -> "
                 f"{'ok' if result.ok else 'error'} ({result.duration_ms} ms)"
@@ -219,9 +222,8 @@ class Kernel:
             run.verification = report
             if not report.passed:
                 run.status = RunStatus.FAILED
-                run.outcome = (
-                    f"{outcome_message}; verification failed: "
-                    + ", ".join(g.gate for g in report.failures)
+                run.outcome = f"{outcome_message}; verification failed: " + ", ".join(
+                    g.gate for g in report.failures
                 )
 
         outcome = RunOutcome(
@@ -251,7 +253,6 @@ class Kernel:
                     "mutating_skills": self._mutating_map(),
                     "skill_params": self._param_map(),
                     "ledger": self.ledger,
-                    "amended_paths": list(self.services.get("amended_paths") or []),
                 },
                 history=[{**obs.to_dict(), "key": obs.key} for obs in self.observations],
             )
@@ -285,9 +286,7 @@ class Kernel:
         try:
             return planner.next_action(self._view(run))
         except Exception as exc:
-            self.state.record(
-                run.run_id, "planner.error", {"error": f"{type(exc).__name__}: {exc}"}
-            )
+            self.state.record(run.run_id, "planner.error", {"error": f"{type(exc).__name__}: {exc}"})
             run.outcome = f"planner failed: {type(exc).__name__}: {exc}"
             return None
 
@@ -316,9 +315,7 @@ class Kernel:
         except Exception:
             return ""
 
-    def _observe(
-        self, step: Step, *, denied: bool = False, denials: list[str] | None = None
-    ) -> Observation:
+    def _observe(self, step: Step, *, denied: bool = False, denials: list[str] | None = None) -> Observation:
         result = step.result
         observation = Observation(
             index=step.index,
@@ -339,7 +336,6 @@ class Kernel:
             self.config,
             state=self.state,
             run_id=run.run_id,
-            amended_paths=list(self.services.get("amended_paths") or []),
         )
         report = suite.run(save=True)
         self.state.record(

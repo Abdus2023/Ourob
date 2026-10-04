@@ -160,7 +160,7 @@ class ManifestDiff:
         return sorted(set(self.added) | set(self.removed) | set(self.changed))
 
     def protected_changes(self, manifest: Manifest) -> list[str]:
-        """Drift that touches a protected path -- requires a ratified amendment."""
+        """Drift that touches a protected path -- requires separate authority."""
         flagged: set[str] = set()
         for relpath in self.added + self.changed + self.removed:
             record = manifest.files.get(relpath)

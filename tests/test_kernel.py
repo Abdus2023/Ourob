@@ -6,13 +6,14 @@ from pathlib import Path
 
 import pytest
 
+from ourob.bootstrap.amend import AmendmentLedger
 from ourob.bootstrap.manifest import Manifest, compare
 from ourob.bootstrap.promote import Promotion
 from ourob.config import Config
 from ourob.kernel import Kernel, RunOutcome
 from ourob.planner.scripted import Plan, ScriptedPlanner
 from ourob.skills.registry import SkillRegistry
-from ourob.state.model import Invocation, RunStatus, StepStatus
+from ourob.state.model import Invocation, RunStatus, SkillResult, StepStatus
 from ourob.state.store import StateStore
 
 FAST_GATES = ["compile", "import", "manifest", "policy-integrity", "skill-contract"]
@@ -84,10 +85,7 @@ def test_the_runtime_refuses_everything_it_should(repo: Path) -> None:
     assert outcome.run.step_count == 5
 
     reasons = {
-        step(outcome, i).invocation.skill
-        + " -> "
-        + (step(outcome, i).result.error or "")
-        for i in range(4)
+        step(outcome, i).invocation.skill + " -> " + (step(outcome, i).result.error or "") for i in range(4)
     }
     text = "\n".join(reasons)
     assert "path-confinement" in text
@@ -97,6 +95,344 @@ def test_the_runtime_refuses_everything_it_should(repo: Path) -> None:
 
     # nothing was written anywhere
     assert compare(Manifest.load(repo), repo).clean
+
+
+def test_direct_protected_mutation_variants_are_denied_before_skill_dispatch(repo: Path) -> None:
+    target = repo / "src" / "ourob" / "policies" / "rules.py"
+    original = target.read_bytes()
+    alias = repo / "docs" / "policy-rules-alias.py"
+    alias.symlink_to(target)
+    plan = Plan.from_dict(
+        {
+            "goal": "attempt direct API mutations through alternate path spellings",
+            "max_steps": 10,
+            "steps": [
+                {"skill": "write_file", "args": {"path": "src/ourob/policies/rules.py", "content": "bad"}},
+                {"skill": "write_file", "args": {"path": str(target), "content": "bad"}},
+                {"skill": "write_file", "args": {"path": "./src/ourob/policies/rules.py", "content": "bad"}},
+                {"skill": "write_file", "args": {"path": "docs/policy-rules-alias.py", "content": "bad"}},
+                {
+                    "skill": "edit_file",
+                    "args": {
+                        "path": "src/ourob/policies/rules.py",
+                        "old_text": "MAX_REPEATS = 3",
+                        "new_text": "MAX_REPEATS = 1",
+                    },
+                },
+                {"skill": "delete_file", "args": {"path": "src/ourob/policies/rules.py"}},
+                {"skill": "write_file", "args": {"path": ".ourob/system.jsonl", "content": "forged"}},
+                {"skill": "finish", "args": {"summary": "attempts were denied", "success": True}},
+            ],
+        }
+    )
+    outcome = Kernel(repo, verify_at_end=False).run(plan.goal, ScriptedPlanner(plan))
+    assert outcome.denied == 7
+    assert all(step.denied for step in outcome.run.steps[:-1])
+    assert target.read_bytes() == original
+    assert alias.is_symlink()
+
+    events = list(StateStore(repo).journal(outcome.run.run_id).events())
+    denied_decisions = [
+        event for event in events if event["kind"] == "policy.decision" and not event["payload"]["allowed"]
+    ]
+    assert len(denied_decisions) == 7
+    assert all(
+        any(
+            decision["policy"] in {"protected-paths", "journal-integrity"} and not decision["allowed"]
+            for decision in event["payload"]["decisions"]
+        )
+        for event in denied_decisions
+    )
+    assert all(
+        event["kind"] != "skill.result"
+        or not event["payload"].get("denied")
+        or "denied" in event["payload"]["result"].get("error", "")
+        for event in events
+    )
+    assert all(result["ok"] for result in StateStore(repo).check_chain())
+
+
+def test_protected_config_symlink_and_its_target_remain_protected(repo: Path) -> None:
+    config = Config.load(repo)
+    protected = repo / "ourob.toml"
+    target = repo / "docs" / "config-alias.toml"
+    original = protected.read_bytes()
+    target.write_bytes(original)
+    protected.unlink()
+    protected.symlink_to(target.relative_to(repo))
+
+    plan = Plan.from_dict(
+        {
+            "goal": "attempt to mutate a protected path through its own symlink",
+            "max_steps": 4,
+            "steps": [
+                {"skill": "write_file", "args": {"path": "ourob.toml", "content": "tampered"}},
+                {"skill": "write_file", "args": {"path": "docs/config-alias.toml", "content": "tampered"}},
+                {"skill": "finish", "args": {"summary": "both aliases were denied", "success": True}},
+            ],
+        }
+    )
+    outcome = Kernel(repo, config=config, verify_at_end=False).run(plan.goal, ScriptedPlanner(plan))
+    assert outcome.denied == 2
+    assert protected.is_symlink()
+    assert target.read_bytes() == original
+
+    events = list(StateStore(repo).journal(outcome.run.run_id).events())
+    denied = [
+        event for event in events if event["kind"] == "policy.decision" and not event["payload"]["allowed"]
+    ]
+    assert len(denied) == 2
+    assert all(
+        any(
+            decision["policy"] == "protected-paths" and not decision["allowed"]
+            for decision in event["payload"]["decisions"]
+        )
+        for event in denied
+    )
+
+
+def test_forged_proposal_file_cannot_authorize_a_protected_edit(repo: Path) -> None:
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    proposal = ledger.propose(["src/ourob/policies/"], "forged-file regression")
+    proposal_path = ledger._path(proposal.amendment_id)
+    proposal_bytes = proposal_path.read_text(encoding="utf-8")
+    proposal_path.unlink()
+    target = repo / "src" / "ourob" / "policies" / "rules.py"
+    before = target.read_bytes()
+
+    plan = Plan.from_dict(
+        {
+            "goal": "replay the forged proposal-file attack from Result 001",
+            "max_steps": 4,
+            "steps": [
+                {
+                    "skill": "write_file",
+                    "args": {
+                        "path": proposal_path.relative_to(repo).as_posix(),
+                        "content": proposal_bytes,
+                    },
+                },
+                {
+                    "skill": "edit_file",
+                    "args": {
+                        "path": "src/ourob/policies/rules.py",
+                        "old_text": "MAX_REPEATS = 3",
+                        "new_text": "MAX_REPEATS = 2",
+                    },
+                },
+                {
+                    "skill": "finish",
+                    "args": {"summary": "forged request did not authorize a write", "success": True},
+                },
+            ],
+        }
+    )
+    outcome = Kernel(repo, verify_at_end=False).run(plan.goal, ScriptedPlanner(plan))
+    assert outcome.denied == 2
+    assert all(step.denied for step in outcome.run.steps[:2])
+    assert not proposal_path.exists()
+    assert target.read_bytes() == before
+    assert ledger.authorising_id(proposal.amendment_id) is None
+
+    events = list(StateStore(repo).journal(outcome.run.run_id).events())
+    denied = [
+        event for event in events if event["kind"] == "policy.decision" and not event["payload"]["allowed"]
+    ]
+    assert len(denied) == 2
+    assert any(
+        decision["policy"] == "journal-integrity" and not decision["allowed"]
+        for decision in denied[0]["payload"]["decisions"]
+    )
+    assert any(
+        decision["policy"] == "protected-paths" and not decision["allowed"]
+        for decision in denied[1]["payload"]["decisions"]
+    )
+    assert all(item["ok"] for item in StateStore(repo).check_chain())
+
+
+def test_in_process_runtime_skill_cannot_issue_an_amendment_grant(repo: Path) -> None:
+    from threading import Thread
+
+    from ourob.errors import BootstrapError, StateError
+    from ourob.skills.base import Skill, skill
+    from ourob.state.store import Journal
+
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    proposal = ledger.propose(["src/ourob/policies/"], "attempt runtime self-authorization")
+
+    @skill(
+        "attempt_authorization",
+        params={"amendment_id": {"type": "string"}},
+        mutating=True,
+    )
+    class AttemptAuthorization(Skill):
+        def run(self, ctx, amendment_id: str) -> SkillResult:
+            blocked: list[str] = []
+
+            def try_from_thread(label, operation, expected_error):
+                errors: list[str] = []
+
+                def invoke():
+                    try:
+                        operation()
+                    except expected_error as exc:
+                        errors.append(f"{label}: {exc}")
+                    except Exception as exc:
+                        errors.append(f"{label}: unexpected {type(exc).__name__}: {exc}")
+                    else:
+                        errors.append(f"{label}: unexpectedly allowed")
+
+                thread = Thread(target=invoke)
+                thread.start()
+                thread.join(timeout=5)
+                if thread.is_alive():
+                    blocked.append(f"{label}: did not finish")
+                else:
+                    blocked.extend(errors)
+
+            try_from_thread(
+                "ledger",
+                lambda: AmendmentLedger(ctx.repo / ".ourob" / "amendments").authorize(
+                    amendment_id,
+                    confirmation=amendment_id,
+                    authorized_by="runtime-skill",
+                ),
+                BootstrapError,
+            )
+            try_from_thread(
+                "system-store",
+                lambda: ctx.store.record_system("amendment.authorized", {}),
+                StateError,
+            )
+            try_from_thread(
+                "low-level-journal",
+                lambda: Journal(ctx.repo / ".ourob" / "system.jsonl").append("amendment.authorized", {}),
+                StateError,
+            )
+            try_from_thread(
+                "run-store",
+                lambda: ctx.store.record(ctx.run_id, "policy.decision", {"allowed": True}),
+                StateError,
+            )
+            try_from_thread(
+                "run-journal",
+                lambda: ctx.store.journal(ctx.run_id).append("policy.decision", {"allowed": True}),
+                StateError,
+            )
+            try_from_thread(
+                "system-rejection",
+                lambda: ctx.store.record_system(
+                    "promotion.rejected", {"accepted": False, "amendment_id": ""}
+                ),
+                StateError,
+            )
+            try_from_thread(
+                "raw-system-rejection",
+                lambda: Journal(ctx.repo / ".ourob" / "system.jsonl").append(
+                    "promotion.rejected", {"accepted": False, "amendment_id": ""}
+                ),
+                StateError,
+            )
+            from ourob.state.model import VerificationReport
+
+            try_from_thread(
+                "verification-report",
+                lambda: ctx.store.save_report(VerificationReport(run_id="forged")),
+                StateError,
+            )
+            try_from_thread(
+                "proposal-rewrite",
+                lambda: AmendmentLedger(ctx.repo / ".ourob" / "amendments").save(
+                    AmendmentLedger(ctx.repo / ".ourob" / "amendments").load(amendment_id)
+                ),
+                BootstrapError,
+            )
+            try_from_thread(
+                "proposal-terminal-state",
+                lambda: AmendmentLedger(ctx.repo / ".ourob" / "amendments").set_status(
+                    amendment_id, "rejected"
+                ),
+                BootstrapError,
+            )
+            return SkillResult(
+                ok=len(blocked) == 10,
+                output="; ".join(blocked),
+                data={"blocked": blocked},
+            )
+
+    registry = SkillRegistry(repo)
+    registry.discover()
+    registry.register(AttemptAuthorization)
+    plan = Plan.from_dict(
+        {
+            "goal": "try to create operator authority from runtime execution",
+            "max_steps": 3,
+            "steps": [
+                {
+                    "skill": "attempt_authorization",
+                    "args": {"amendment_id": proposal.amendment_id},
+                },
+                {"skill": "finish", "args": {"summary": "authorization remained external", "success": True}},
+            ],
+        }
+    )
+    outcome = Kernel(repo, registry=registry, verify_at_end=False).run(plan.goal, ScriptedPlanner(plan))
+
+    attempt = outcome.run.steps[0]
+    assert attempt.result is not None and attempt.result.ok
+    assert len(attempt.result.data["blocked"]) == 10
+    assert ledger.authorising_id(proposal.amendment_id) is None
+    assert not any(event["kind"] == "amendment.authorized" for event in StateStore(repo).system_events())
+    assert all(item["ok"] for item in StateStore(repo).check_chain())
+
+
+def test_direct_mutating_skills_cannot_overwrite_delete_or_create_under_protection(repo: Path) -> None:
+    target = repo / "src" / "ourob" / "policies" / "rules.py"
+    original = target.read_bytes()
+    new_target = repo / "src" / "ourob" / "policies" / "unapproved.py"
+    plan = Plan.from_dict(
+        {
+            "goal": "attempt direct file-skill mutations of protected files and directories",
+            "max_steps": 6,
+            "steps": [
+                {
+                    "skill": "write_file",
+                    "args": {"path": target.relative_to(repo).as_posix(), "content": "tampered"},
+                },
+                {
+                    "skill": "edit_file",
+                    "args": {
+                        "path": target.relative_to(repo).as_posix(),
+                        "old_text": "MAX_REPEATS = 3",
+                        "new_text": "MAX_REPEATS = 2",
+                    },
+                },
+                {"skill": "delete_file", "args": {"path": target.relative_to(repo).as_posix()}},
+                {
+                    "skill": "write_file",
+                    "args": {"path": new_target.relative_to(repo).as_posix(), "content": "unapproved"},
+                },
+                {"skill": "delete_file", "args": {"path": "src/ourob/policies"}},
+                {"skill": "finish", "args": {"summary": "protected mutations denied", "success": True}},
+            ],
+        }
+    )
+    outcome = Kernel(repo, verify_at_end=False).run(plan.goal, ScriptedPlanner(plan))
+
+    assert outcome.denied == 5
+    assert target.read_bytes() == original
+    assert not new_target.exists()
+    for item in outcome.run.steps[:5]:
+        assert item.denied
+        assert any(
+            decision.policy == "protected-paths" and not decision.allowed for decision in item.decisions
+        )
+
+    events = list(StateStore(repo).journal(outcome.run.run_id).events())
+    decisions = [event for event in events if event["kind"] == "policy.decision"]
+    assert len(decisions) == 6
+    assert all(not event["payload"]["allowed"] for event in decisions[:5])
+    assert all(item["ok"] for item in StateStore(repo).check_chain())
 
 
 def test_a_denied_step_does_not_execute_the_skill(repo: Path) -> None:
@@ -121,20 +457,32 @@ def test_the_run_continues_after_a_refusal(repo: Path) -> None:
 def test_the_runtime_adds_a_skill_to_itself(repo: Path) -> None:
     outcome = run_plan(repo, "self_extend.json")
     assert outcome.run.status is RunStatus.COMPLETED, outcome.summary()
-    assert (repo / "src" / "ourob" / "skills" / "contrib" / "rot13.py").is_file()
-    assert (repo / "tests" / "test_contrib_rot13.py").is_file()
+    assert (repo / "src" / "ourob" / "skills" / "contrib" / "text_metrics.py").is_file()
+    assert (repo / "tests" / "test_contrib_text_metrics.py").is_file()
 
-    # a fresh registry -- no restart, no install step -- sees it
+    # The runtime's startup journal records its initial discovery snapshot; the
+    # later list_skills result must report the new file as pending, not hot-loaded.
+    store = StateStore(repo)
+    start = next(
+        event for event in store.journal(outcome.run.run_id).events() if event["kind"] == "runtime.started"
+    )
+    assert start["payload"]["skill_discovery"]["complete"] is True
+    listed = next(step for step in outcome.run.steps if step.invocation.skill == "list_skills")
+    assert listed.result is not None
+    assert listed.result.data["discovery"]["restart_required"] is True
+    assert "src/ourob/skills/contrib/text_metrics.py" in listed.result.data["discovery"]["pending"]["added"]
+
     registry = SkillRegistry(repo)
     assert registry.discover() == []
-    assert registry.has("rot13")
+    assert registry.has("text_metrics")
     from ourob.skills.base import SkillContext
 
     result = registry.dispatch(
-        Invocation(skill="rot13", args={"text": "ourob"}), SkillContext(repo=repo, services={})
+        Invocation(skill="text_metrics", args={"text": "one two\nthree"}),
+        SkillContext(repo=repo, services={}),
     )
     assert result.ok
-    assert result.output == "bhebo"
+    assert result.data["words"] == 3
 
 
 def test_self_extension_survives_a_cold_start(repo: Path) -> None:
@@ -147,25 +495,49 @@ def test_self_extension_survives_a_cold_start(repo: Path) -> None:
     assert module is not None
     assert report.trusted  # ordinary drift does not break the bootstrap
     # the fixture always replaces tests/, so this file is always an addition
-    assert "tests/test_contrib_rot13.py" in report.drift.added
+    assert "tests/test_contrib_text_metrics.py" in report.drift.added
     assert not any(p for p in report.drift.touched if Config.load(repo).is_protected(p))
 
     registry = SkillRegistry(repo)
     registry.discover()
-    assert registry.has("rot13")
+    assert registry.has("text_metrics")
 
 
-def test_a_verified_run_can_be_promoted(repo: Path) -> None:
+def test_new_self_extension_is_verified_and_promoted_with_the_same_tree_digest(
+    repo: Path,
+) -> None:
+    target = "src/ourob/skills/contrib/text_metrics.py"
+    test_target = "tests/test_contrib_text_metrics.py"
+    baseline = Manifest.load(repo)
+    assert target not in baseline.paths()
+    assert test_target not in baseline.paths()
+
     outcome = run_plan(repo, "self_extend.json", verify=True)
     assert outcome.ok, outcome.summary()
     assert outcome.report is not None and outcome.report.passed
+    assert target in outcome.run.touched
+    assert test_target in outcome.run.touched
+
+    prepromotion_tree_digest = Manifest.build(repo).digest
+    assert outcome.report.tree_digest == prepromotion_tree_digest
+    assert outcome.report.repo_digest == baseline.digest
 
     result = Promotion(repo, use_git=False).promote(
-        message="add the rot13 skill", gates=FAST_GATES + ["tests"]
+        message="add the new text_metrics skill", gates=FAST_GATES + ["tests"]
     )
     assert result.accepted, result.describe()
+    assert result.prepromotion_tree_digest == prepromotion_tree_digest
+    assert result.lock_digest == prepromotion_tree_digest
+    assert result.report is not None and result.report.tree_digest == prepromotion_tree_digest
     assert compare(Manifest.load(repo), repo).clean
-    assert "src/ourob/skills/contrib/rot13.py" in Manifest.load(repo).paths()
+    assert Manifest.load(repo).digest == prepromotion_tree_digest
+
+    accepted = [event for event in StateStore(repo).system_events() if event["kind"] == "promotion.accepted"]
+    assert len(accepted) == 1
+    evidence = accepted[0]["payload"]
+    assert evidence["prepromotion_tree_digest"] == prepromotion_tree_digest
+    assert evidence["lock_digest"] == prepromotion_tree_digest
+    assert evidence["verification"]["tree_digest"] == prepromotion_tree_digest
 
 
 def test_a_snapshot_is_taken_before_the_first_mutation(repo: Path) -> None:
@@ -177,7 +549,7 @@ def test_a_snapshot_is_taken_before_the_first_mutation(repo: Path) -> None:
     assert snapshot.files == len(Manifest.load(repo).files)  # taken before the new files existed
     drift = snapshot.drift_since()
     assert not drift.clean
-    assert "tests/test_contrib_rot13.py" in drift.added
+    assert "tests/test_contrib_text_metrics.py" in drift.added
 
     # rolling back returns the tree to exactly the pre-run state
     snapshot.restore()
@@ -227,9 +599,9 @@ def test_a_failed_change_can_be_rolled_back_exactly(repo: Path) -> None:
     assert outcome.report is not None and not outcome.report.passed
     assert "tests" in [g.gate for g in outcome.report.failures]
 
-    result = Promotion(
-        repo, use_git=False, snapshot_run_id=outcome.snapshot
-    ).promote(gates=["compile", "tests"])
+    result = Promotion(repo, use_git=False, snapshot_run_id=outcome.snapshot).promote(
+        gates=["compile", "tests"]
+    )
     assert not result.accepted
     assert not (repo / "tests" / "test_deliberate.py").exists()
     assert Snapshot.load(repo, outcome.snapshot).drift_since().clean
@@ -238,31 +610,38 @@ def test_a_failed_change_can_be_rolled_back_exactly(repo: Path) -> None:
 # -- amendments -----------------------------------------------------------
 
 
-def test_the_runtime_amends_its_own_guardrails_under_the_rules(repo: Path) -> None:
+def test_runtime_proposal_alone_does_not_authorize_a_protected_write(repo: Path) -> None:
+    baseline = Manifest.load(repo)
     outcome = run_plan(repo, "amend_policy.json")
     assert outcome.run.status is RunStatus.COMPLETED, outcome.summary()
-    assert outcome.denied == 0
+    assert outcome.denied == 1
 
     text = (repo / "src" / "ourob" / "policies" / "rules.py").read_text(encoding="utf-8")
-    assert "MAX_REPEATS = 2" in text
+    assert "MAX_REPEATS = 3" in text
+    assert "MAX_REPEATS = 2" not in text
 
     from ourob.bootstrap.amend import AmendmentLedger, AmendmentStatus
 
     ledger = AmendmentLedger(repo / ".ourob" / "amendments")
-    amendments = ledger.active()
-    assert len(amendments) == 1
-    assert amendments[0].paths == ["src/ourob/policies/"]
-    assert "MAX_REPEATS" in amendments[0].rationale
+    proposals = ledger.all()
+    assert len(proposals) == 1
+    proposal = proposals[0]
+    assert proposal.status == AmendmentStatus.PROPOSED
+    assert proposal.paths == ["src/ourob/policies/"]
+    assert "MAX_REPEATS" in proposal.rationale
+    assert ledger.active() == []
+    assert ledger.authorising_id(proposal.amendment_id) is None
+    assert not any(event["kind"] == "amendment.authorized" for event in StateStore(repo).system_events())
 
-    # the change is not official until it is promoted under the amendment
     result = Promotion(repo, use_git=False).promote(
-        amendment_id=amendments[0].amendment_id,
-        message="lower MAX_REPEATS",
-        gates=FAST_GATES + ["tests"],
+        amendment_id=proposal.amendment_id,
+        message="must not promote an ungranted proposal",
+        gates=FAST_GATES,
     )
-    assert result.accepted, result.describe()
-    assert ledger.load(amendments[0].amendment_id).status == AmendmentStatus.RATIFIED
-    assert compare(Manifest.load(repo), repo).clean
+    assert not result.accepted
+    assert any("no valid current operator authorization" in message for message in result.messages)
+    assert Manifest.load(repo).digest == baseline.digest
+    assert compare(baseline, repo).clean
 
 
 def test_protected_writes_without_an_amendment_are_refused(repo: Path) -> None:
@@ -285,9 +664,7 @@ def test_protected_writes_without_an_amendment_are_refused(repo: Path) -> None:
     )
     outcome = Kernel(repo, verify_at_end=False).run(plan.goal, ScriptedPlanner(plan))
     assert outcome.denied == 1
-    assert "MAX_REPEATS = 3" in (repo / "src" / "ourob" / "policies" / "rules.py").read_text(
-        encoding="utf-8"
-    )
+    assert "MAX_REPEATS = 3" in (repo / "src" / "ourob" / "policies" / "rules.py").read_text(encoding="utf-8")
 
 
 # -- limits ---------------------------------------------------------------
@@ -350,8 +727,10 @@ def test_an_unknown_skill_is_a_recorded_error_not_a_crash(repo: Path) -> None:
         {
             "goal": "ask for something that does not exist",
             "max_steps": 3,
-            "steps": [{"skill": "teleport", "args": {}},
-                      {"skill": "finish", "args": {"summary": "ok", "success": True}}],
+            "steps": [
+                {"skill": "teleport", "args": {}},
+                {"skill": "finish", "args": {"summary": "ok", "success": True}},
+            ],
         }
     )
     outcome = Kernel(repo, verify_at_end=False).run(plan.goal, ScriptedPlanner(plan))

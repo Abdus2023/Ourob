@@ -1,11 +1,10 @@
 """Skill discovery and dispatch.
 
-Discovery has two tiers:
-
-``builtin``  shipped with the runtime, imported as a package.
-``contrib``  anything the runtime (or a human) has written into the repository.
-             Loaded by file path with :mod:`importlib`, so a skill authored
-             during a run is available on the next pass with no install step.
+Discovery has two tiers: builtins shipped in the package, and contrib modules
+loaded from ``src/ourob/skills/contrib`` when a registry is created. A registry
+is an immutable startup snapshot for the lifetime of its runtime. Files added,
+changed, or removed during a run are reported as pending and are not imported or
+invoked by that process; verify and promote them, then start a fresh runtime.
 
 ``discover()`` is idempotent and returns the problems it found rather than
 raising, because a half-written contrib skill must not stop the runtime from
@@ -14,6 +13,7 @@ booting -- it should stop the runtime from *using* that skill.
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import importlib.util
 import pkgutil
@@ -21,7 +21,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .. import fsx
 from ..errors import SkillError, SkillNotFound
 from ..schema import coerce
 from ..state.model import Invocation, SkillResult
@@ -37,15 +36,22 @@ class SkillRegistry:
         self._skills: dict[str, Skill] = {}
         self._modules: dict[str, str] = {}
         self._problems: list[str] = []
+        self._contrib_snapshot: dict[str, str] | None = None
+        self._discovered = False
+        self._frozen = False
 
     # -- discovery --------------------------------------------------------
     def discover(self) -> list[str]:
-        """(Re)scan builtin and contrib skills.  Returns problems found."""
+        """Take the one immutable discovery snapshot for this registry."""
+        if self._discovered:
+            return list(self._problems)
         self._skills.clear()
         self._modules.clear()
         self._problems = []
         self._load_builtin()
         self._load_contrib()
+        self._contrib_snapshot = self._scan_contrib()
+        self._discovered = True
         return list(self._problems)
 
     def _load_builtin(self) -> None:
@@ -67,12 +73,18 @@ class SkillRegistry:
 
     def _load_contrib(self) -> None:
         contrib = self.repo / CONTRIB_DIR
+        if contrib.is_symlink():
+            self._problems.append(f"{CONTRIB_DIR}: contrib directory symlink is not followed")
+            return
         if not contrib.is_dir():
             return
         for path in sorted(contrib.glob("*.py")):
             if path.name.startswith("_"):
                 continue
-            relpath = fsx.rel(path, self.repo)
+            relpath = path.relative_to(self.repo).as_posix()
+            if path.is_symlink():
+                self._problems.append(f"{relpath}: contrib symlink is not followed")
+                continue
             module_name = f"ourob_contrib_{path.stem}"
             spec = importlib.util.spec_from_file_location(module_name, path)
             if spec is None or spec.loader is None:
@@ -89,6 +101,45 @@ class SkillRegistry:
                 self._problems.append(f"{relpath}: import failed: {type(exc).__name__}: {exc}")
                 continue
             self._harvest(module, relpath)
+
+    def _scan_contrib(self) -> dict[str, str]:
+        """Fingerprint contrib files without importing or executing them."""
+        contrib = self.repo / CONTRIB_DIR
+        if contrib.is_symlink() or not contrib.is_dir():
+            return {}
+        snapshot: dict[str, str] = {}
+        for path in sorted(contrib.glob("*.py")):
+            if path.name.startswith("_"):
+                continue
+            relpath = path.relative_to(self.repo).as_posix()
+            try:
+                snapshot[relpath] = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError as exc:
+                snapshot[relpath] = f"unreadable:{type(exc).__name__}:{exc}"
+        return snapshot
+
+    def discovery_status(self) -> dict[str, Any]:
+        """Compare the startup registry snapshot with current contrib bytes."""
+        if self._contrib_snapshot is None:
+            return {
+                "snapshot": "not-discovered",
+                "complete": False,
+                "restart_required": True,
+                "pending": {"added": [], "changed": [], "removed": []},
+            }
+        current = self._scan_contrib()
+        baseline = self._contrib_snapshot
+        added = sorted(set(current) - set(baseline))
+        removed = sorted(set(baseline) - set(current))
+        changed = sorted(path for path in set(current) & set(baseline) if current[path] != baseline[path])
+        pending = {"added": added, "changed": changed, "removed": removed}
+        stale = bool(added or changed or removed)
+        return {
+            "snapshot": "runtime-start",
+            "complete": not stale,
+            "restart_required": stale,
+            "pending": pending,
+        }
 
     def _harvest(self, module: Any, origin: str) -> None:
         for cls in getattr(module, SKILL_ATTR, []):
@@ -110,7 +161,15 @@ class SkillRegistry:
             self._modules[spec.name] = origin
 
     # -- access -----------------------------------------------------------
+    def freeze(self) -> None:
+        """Prevent registry mutation once it is bound to a running Kernel."""
+        if not self._discovered:
+            raise SkillError("cannot freeze the skill registry before discovery")
+        self._frozen = True
+
     def register(self, cls: type[Skill]) -> None:
+        if self._frozen:
+            raise SkillError("skill registry is frozen; new skills require a fresh runtime")
         spec = getattr(cls, "spec", None)
         if spec is None:
             raise SkillError(f"{cls.__name__} is missing a skill spec; use @skill(...)")
@@ -143,14 +202,20 @@ class SkillRegistry:
         return list(self._problems)
 
     # -- dispatch ---------------------------------------------------------
-    def dispatch(
-        self, invocation: Invocation, ctx: SkillContext
-    ) -> SkillResult:
+    def dispatch(self, invocation: Invocation, ctx: SkillContext) -> SkillResult:
         """Validate arguments against the declared schema, then execute."""
         try:
             instance = self.get(invocation.skill)
         except SkillNotFound as exc:
-            return SkillResult(ok=False, error=str(exc), output=str(exc))
+            message = str(exc)
+            status = self.discovery_status()
+            if status["restart_required"]:
+                pending = [path for paths in status["pending"].values() for path in paths]
+                message += (
+                    "; contrib discovery snapshot is stale; verify/promote and start a fresh "
+                    f"runtime before invoking pending files: {', '.join(pending)}"
+                )
+            return SkillResult(ok=False, error=message, output=message)
         try:
             args = coerce(invocation.args, instance.spec.params)
         except SkillError as exc:
@@ -159,4 +224,7 @@ class SkillRegistry:
                 error=f"invalid arguments: {exc}",
                 output=f"invalid arguments for {invocation.skill}: {exc}",
             )
-        return instance.timed(ctx, **args)
+        from ..bootstrap.amend import skill_execution
+
+        with skill_execution():
+            return instance.timed(ctx, **args)

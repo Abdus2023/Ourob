@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from amendment_helpers import operator_authorize
 from ourob.bootstrap.amend import AmendmentLedger
 from ourob.config import Config
 from ourob.policies.base import PolicySet, ReviewContext
@@ -41,7 +42,7 @@ def ctx(
     history: list | None = None,
     services: dict | None = None,
 ) -> ReviewContext:
-    base: dict = {"mutating_skills": MUTATING, "amended_paths": []}
+    base: dict = {"mutating_skills": MUTATING}
     base.update(services or {})
     return ReviewContext(
         repo=repo,
@@ -85,18 +86,20 @@ def test_protected_write_is_refused_without_an_amendment(repo: Path) -> None:
 
 
 def test_protected_read_is_allowed(repo: Path) -> None:
-    assert ProtectedPathPolicy().review(
-        ctx(repo, "read_file", {"path": "src/ourob/policies/base.py"})
-    ).allowed
+    assert (
+        ProtectedPathPolicy().review(ctx(repo, "read_file", {"path": "src/ourob/policies/base.py"})).allowed
+    )
 
 
 def test_ordinary_write_is_allowed(repo: Path) -> None:
-    assert ProtectedPathPolicy().review(
-        ctx(repo, "write_file", {"path": "src/ourob/skills/contrib/new.py", "content": "x"})
-    ).allowed
+    assert (
+        ProtectedPathPolicy()
+        .review(ctx(repo, "write_file", {"path": "src/ourob/skills/contrib/new.py", "content": "x"}))
+        .allowed
+    )
 
 
-def test_protected_write_is_allowed_with_an_amendment(repo: Path) -> None:
+def test_proposal_alone_does_not_authorize_a_protected_write(repo: Path) -> None:
     ledger = AmendmentLedger(repo / ".ourob" / "amendments")
     amendment = ledger.propose(["src/ourob/policies/"], "tighten a rule", proposed_by="test")
     verdict = ProtectedPathPolicy().review(
@@ -107,8 +110,33 @@ def test_protected_write_is_allowed_with_an_amendment(repo: Path) -> None:
             services={"ledger": ledger},
         )
     )
+    assert not verdict.allowed
+    assert ledger.authorising_id(amendment.amendment_id) is None
+
+
+def test_separately_authorized_amendment_covers_only_its_path(repo: Path) -> None:
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    amendment = ledger.propose(["src/ourob/policies/"], "tighten a rule", proposed_by="test")
+    operator_authorize(ledger, amendment.amendment_id, authorized_by="operator-test")
+    verdict = ProtectedPathPolicy().review(
+        ctx(
+            repo,
+            "write_file",
+            {"path": "src/ourob/policies/base.py", "content": "x"},
+            services={"ledger": ledger},
+        )
+    )
     assert verdict.allowed, verdict.reason
     assert amendment.amendment_id in verdict.reason
+    outside = ProtectedPathPolicy().review(
+        ctx(
+            repo,
+            "write_file",
+            {"path": "ourob.toml", "content": "x"},
+            services={"ledger": ledger},
+        )
+    )
+    assert not outside.allowed
 
 
 def test_a_rejected_amendment_authorises_nothing(repo: Path) -> None:
@@ -139,7 +167,15 @@ def test_config_protected_patterns_cover_directories_and_files(repo: Path) -> No
 
 @pytest.mark.parametrize(
     "target",
-    [".ourob/journal/run-x.jsonl", ".ourob/index.jsonl", ".ourob/verify/run-x.json"],
+    [
+        ".ourob/journal/run-x.jsonl",
+        ".ourob/journal/run-x.jsonl.head",
+        ".ourob/index.jsonl",
+        ".ourob/system.jsonl",
+        ".ourob/verify/run-x.json",
+        ".ourob/amendments/amd-x.json",
+        ".ourob/snapshots/x/tree/a.py",
+    ],
 )
 def test_history_is_immutable(repo: Path, target: str) -> None:
     verdict = JournalIntegrityPolicy().review(ctx(repo, "write_file", {"path": target, "content": ""}))
@@ -147,10 +183,12 @@ def test_history_is_immutable(repo: Path, target: str) -> None:
     assert "immutable" in verdict.reason
 
 
-def test_snapshots_are_writable(repo: Path) -> None:
-    assert JournalIntegrityPolicy().review(
+def test_runtime_snapshots_are_immutable(repo: Path) -> None:
+    verdict = JournalIntegrityPolicy().review(
         ctx(repo, "write_file", {"path": ".ourob/snapshots/x/tree/a.py", "content": ""})
-    ).allowed
+    )
+    assert not verdict.allowed
+    assert "immutable" in verdict.reason
 
 
 # -- budget, payload, commands, loops -------------------------------------
@@ -183,9 +221,11 @@ def test_command_allowlist_blocks_deny_patterns(repo: Path) -> None:
 
 
 def test_command_allowlist_permits_listed_commands(repo: Path) -> None:
-    assert CommandAllowlistPolicy().review(
-        ctx(repo, "run_command", {"argv": ["python", "-m", "pytest", "-q"]})
-    ).allowed
+    assert (
+        CommandAllowlistPolicy()
+        .review(ctx(repo, "run_command", {"argv": ["python", "-m", "pytest", "-q"]}))
+        .allowed
+    )
 
 
 def test_command_allowlist_ignores_other_skills(repo: Path) -> None:
@@ -218,9 +258,7 @@ def test_a_declared_path_parameter_is_confined(repo: Path) -> None:
         repo,
         "deploy",
         {"destination_file": "../../etc/passwd"},
-        services={
-            "skill_params": {"deploy": {"destination_file": {"type": "str", "path": True}}}
-        },
+        services={"skill_params": {"deploy": {"destination_file": {"type": "str", "path": True}}}},
     )
     assert context.declared_path_params() == {"destination_file"}
     verdict = PathConfinementPolicy().review(context)
@@ -249,9 +287,7 @@ def test_a_declared_path_reaches_the_protected_path_policy(repo: Path) -> None:
         repo,
         "deploy",
         {"destination_file": "src/ourob/policies/rules.py"},
-        services={
-            "skill_params": {"deploy": {"destination_file": {"type": "str", "path": True}}}
-        },
+        services={"skill_params": {"deploy": {"destination_file": {"type": "str", "path": True}}}},
     )
     assert not ProtectedPathPolicy().review(context).allowed
 
@@ -260,7 +296,8 @@ def test_the_advisory_hole_warner_is_retired() -> None:
     """Replaced by a declared contract plus a static gate, not a warning."""
     assert "path-key-coverage" not in POLICY_CLASSES
     assert not hasattr(__import__("ourob.policies.rules", fromlist=["x"]), "PathKeyCoveragePolicy")
-    assert len(POLICY_CLASSES) == 7
+    assert len(POLICY_CLASSES) == 8
+    assert "child-filesystem" in POLICY_CLASSES
 
 
 # -- the set --------------------------------------------------------------
@@ -281,9 +318,7 @@ def test_policy_set_allows_a_clean_call(repo: Path) -> None:
 
 
 def test_a_clean_call_produces_no_warnings(repo: Path) -> None:
-    outcome = default_policy_set().review(
-        ctx(repo, "write_file", {"path": "src/a.py", "content": "x"})
-    )
+    outcome = default_policy_set().review(ctx(repo, "write_file", {"path": "src/a.py", "content": "x"}))
     assert outcome.allowed
     assert outcome.warnings == []
     assert all(d.allowed for d in outcome.decisions)

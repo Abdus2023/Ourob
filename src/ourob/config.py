@@ -1,8 +1,8 @@
 """Repository configuration (``ourob.toml``).
 
 The config is deliberately small and deliberately *protected*: it is where the
-runtime is told which paths it may not touch without a ratified amendment and
-which gates must be green before anything is promoted.  A system that can edit
+runtime is told which paths it may not touch without a separate operator grant
+and which gates must be green before anything is promoted. A system that can edit
 its own guardrails has no guardrails, so editing this file is a constitutional
 act, not an engineering one.
 """
@@ -95,8 +95,6 @@ class PolicyConfig:
             "git status",
             "git diff",
             "git log",
-            "git add",
-            "git commit",
             "ruff",
             "mypy",
         ]

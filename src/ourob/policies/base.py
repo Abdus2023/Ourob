@@ -100,9 +100,6 @@ class ReviewContext:
             return None
         return ledger.authorising(relpath)
 
-    def amended_paths(self) -> list[str]:
-        return list(self.services.get("amended_paths") or [])
-
     def history_key(self) -> str:
         import json
 

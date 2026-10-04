@@ -27,6 +27,7 @@ DEFAULT_EXCLUDES = frozenset(
         ".pytest_cache",
         ".mypy_cache",
         ".ruff_cache",
+        "coverage",
         "node_modules",
         "dist",
         "build",
@@ -116,7 +117,12 @@ def walk_repo(
             if d not in exclude and not d.endswith(".egg-info")
         )
         for name in sorted(filenames):
-            if name.endswith((".pyc", ".pyo")) or name.endswith("~"):
+            if (
+                name.endswith((".pyc", ".pyo"))
+                or name.endswith("~")
+                or name == ".coverage"
+                or name.startswith(".coverage.")
+            ):
                 continue
             yield Path(dirpath) / name
 

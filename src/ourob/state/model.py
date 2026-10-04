@@ -8,6 +8,7 @@ what makes a run replayable and a crash recoverable.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
@@ -219,6 +220,7 @@ class VerificationReport:
     gates: list[GateResult] = field(default_factory=list)
     duration_ms: int = 0
     repo_digest: str = ""
+    tree_digest: str = ""
     created_at: float = field(default_factory=now)
 
     @property
@@ -231,7 +233,12 @@ class VerificationReport:
 
     @property
     def digest(self) -> str:
-        return fsx.sha256_text(repr([g.to_dict() for g in self.gates]))
+        evidence = {
+            "gates": [gate.to_dict() for gate in self.gates],
+            "repo_digest": self.repo_digest,
+            "tree_digest": self.tree_digest,
+        }
+        return fsx.sha256_text(json.dumps(evidence, sort_keys=True, separators=(",", ":")))
 
     def summary_line(self) -> str:
         total = len(self.gates)
@@ -246,6 +253,7 @@ class VerificationReport:
                 "gates": self.gates,
                 "duration_ms": self.duration_ms,
                 "repo_digest": self.repo_digest,
+                "tree_digest": self.tree_digest,
                 "created_at": self.created_at,
                 "created_stamp": stamp(self.created_at),
                 "passed": self.passed,
@@ -260,6 +268,7 @@ class VerificationReport:
             gates=[GateResult.from_dict(g) for g in data.get("gates", [])],
             duration_ms=int(data.get("duration_ms", 0)),
             repo_digest=data.get("repo_digest", ""),
+            tree_digest=data.get("tree_digest", ""),
             created_at=float(data.get("created_at", now())),
         )
 

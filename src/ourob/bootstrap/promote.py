@@ -2,12 +2,14 @@
 
 Sequence, in order, with no shortcuts:
 
-1. diff the tree against the last ratified lock;
-2. if any *protected* path drifted, require an amendment that names it;
-3. run the verification suite;
-4. on failure, roll the tree back to the pre-run snapshot and mark the amendment
-   rejected -- the repository ends up exactly as it started;
-5. on success, rewrite the lock, commit, and ratify the amendment.
+1. diff the tree against the current bootstrap lock;
+2. for protected drift, require a separately recorded operator grant pinned to
+   the exact proposal, base revision, lock digest, and paths;
+3. run the verification suite and require its tree digest to match the candidate;
+4. on failure, reject any grant and roll back to the pre-run snapshot when one is
+   available;
+5. on success, require the resulting lock digest to equal the verified tree,
+   commit if enabled, and record the terminal promotion event.
 
 A change that has not been through this function is drift.  Drift does not boot
 by default, does not update the lock, and is not a ratified version of the
@@ -43,6 +45,7 @@ class PromotionResult:
     messages: list[str] = field(default_factory=list)
     rollback: dict[str, Any] = field(default_factory=dict)
     git_sha: str = ""
+    prepromotion_tree_digest: str = ""
     lock_digest: str = ""
     created_at: str = field(default_factory=stamp)
 
@@ -55,6 +58,7 @@ class PromotionResult:
             "messages": self.messages,
             "rollback": self.rollback,
             "git_sha": self.git_sha,
+            "prepromotion_tree_digest": self.prepromotion_tree_digest,
             "lock_digest": self.lock_digest,
             "created_at": self.created_at,
             "verification": self.report.to_dict() if self.report else None,
@@ -71,6 +75,10 @@ class PromotionResult:
             lines.append(f"  protected paths touched: {', '.join(self.protected)}")
         if self.amendment_id:
             lines.append(f"  amendment: {self.amendment_id}")
+        if self.prepromotion_tree_digest:
+            lines.append(f"  pre-promotion tree: {self.prepromotion_tree_digest}")
+        if self.lock_digest:
+            lines.append(f"  lock digest: {self.lock_digest}")
         if self.git_sha:
             lines.append(f"  commit: {self.git_sha}")
         for message in self.messages:
@@ -145,6 +153,9 @@ class Promotion:
         diff = compare(manifest, self.repo)
         result.diff = diff
         result.lock_digest = manifest.digest
+        result.prepromotion_tree_digest = Manifest.build(
+            self.repo, version=manifest.version
+        ).digest
 
         protected = sorted(p for p in diff.touched if self.config.is_protected(p))
         result.protected = protected
@@ -152,12 +163,21 @@ class Promotion:
         amendment = None
         if amendment_id:
             try:
-                amendment = self.ledger.load(amendment_id)
+                self.ledger.load(amendment_id)
             except Exception as exc:
                 result.messages.append(f"amendment {amendment_id!r} could not be loaded: {exc}")
                 return result
-            if not amendment.active:
-                result.messages.append(f"amendment {amendment_id} is {amendment.status}, not active")
+            amendment = self.ledger.authorising_id(amendment_id)
+            if amendment is None:
+                result.messages.append(
+                    f"amendment {amendment_id} has no valid current operator authorization "
+                    "(proposal files are not authority; check revision, digest, and history)"
+                )
+                return result
+            if not protected:
+                result.messages.append(
+                    f"amendment {amendment_id} names no protected drift; refusing to consume it"
+                )
                 return result
             uncovered = [p for p in protected if not amendment.covers(p)]
             if uncovered:
@@ -166,19 +186,14 @@ class Promotion:
                 )
                 return result
             result.amendment_id = amendment_id
-            if protected:
-                result.messages.append(
-                    f"amendment {amendment_id} authorises {', '.join(protected)}"
-                )
-            else:
-                result.messages.append(
-                    f"amendment {amendment_id} named no drifted path; it will still be closed"
-                )
+            result.messages.append(
+                f"independent authorization {amendment_id} covers {', '.join(protected)}"
+            )
         elif protected:
             result.messages.append(
                 "protected paths drifted with no amendment: "
                 + ", ".join(protected)
-                + "; open one with `ourob amend` and retry"
+                + "; propose with `ourob amend`, then obtain an operator grant with `ourob authorize`"
             )
             self.state.record_system("promotion.rejected", result.to_dict())
             return result
@@ -189,15 +204,25 @@ class Promotion:
             gates=gates,
             state=self.state,
             run_id=new_id("promote"),
-            amended_paths=protected,
         )
         report = suite.run(save=save_report)
         result.report = report
 
-        if not report.passed:
+        tree_digest_matches = (
+            bool(result.prepromotion_tree_digest)
+            and report.tree_digest == result.prepromotion_tree_digest
+        )
+        if not tree_digest_matches:
             result.messages.append(
-                "verification failed: " + ", ".join(g.gate for g in report.failures)
+                "verification tree digest mismatch: "
+                f"expected {result.prepromotion_tree_digest or '(missing)'}, "
+                f"observed {report.tree_digest or '(missing)'}"
             )
+        if not report.passed or not tree_digest_matches:
+            if not report.passed:
+                result.messages.append(
+                    "verification failed: " + ", ".join(g.gate for g in report.failures)
+                )
             if amendment is not None:
                 self.ledger.set_status(
                     amendment.amendment_id,
@@ -213,21 +238,48 @@ class Promotion:
 
         notes = message.strip() or f"promoted at {result.created_at}"
         new_manifest = Manifest.build(self.repo, notes=notes, version=manifest.version + 1)
+        if new_manifest.digest != result.prepromotion_tree_digest:
+            result.messages.append(
+                "tree changed after verification: "
+                f"pre-promotion {result.prepromotion_tree_digest}, "
+                f"lock candidate {new_manifest.digest}; promotion refused"
+            )
+            if amendment is not None:
+                self.ledger.set_status(
+                    amendment.amendment_id,
+                    AmendmentStatus.REJECTED,
+                    evidence={
+                        "verification_digest": report.digest,
+                        "prepromotion_tree_digest": result.prepromotion_tree_digest,
+                        "lock_candidate_digest": new_manifest.digest,
+                    },
+                )
+            if self.rollback_on_failure:
+                result.rollback = self._rollback()
+            self.state.record_system("promotion.rejected", result.to_dict())
+            return result
         new_manifest.save()
         result.lock_digest = new_manifest.digest
         result.messages.append(
             f"lock rewritten ({len(new_manifest)} files) -> {new_manifest.digest[:16]}"
         )
-        result.git_sha = self._commit(f"ourob: {notes}")
-        if result.git_sha:
-            result.messages.append(f"committed as {result.git_sha}")
         if amendment is not None:
             self.ledger.set_status(
                 amendment.amendment_id,
                 AmendmentStatus.RATIFIED,
-                evidence={"digest": report.digest, "lock": new_manifest.digest},
+                evidence={
+                    "digest": report.digest,
+                    "base_lock_digest": manifest.digest,
+                    "prepromotion_tree_digest": result.prepromotion_tree_digest,
+                    "lock": new_manifest.digest,
+                },
             )
             result.messages.append(f"amendment {amendment.amendment_id} ratified")
+        # Commit only after the grant has been consumed; the authorization is
+        # pinned to the pre-promotion revision and lock digest.
+        result.git_sha = self._commit(f"ourob: {notes}")
+        if result.git_sha:
+            result.messages.append(f"committed as {result.git_sha}")
 
         if self.snapshot_run_id and Snapshot.list_for(self.repo):
             with contextlib.suppress(Exception):

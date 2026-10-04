@@ -11,8 +11,9 @@ an engineering act. It is a constitutional one, and it has a procedure.
 
 ## Article 1 — Protected paths
 
-The following may not be written by a skill during a run unless an active
-amendment names them. The list lives in `ourob.toml`:
+The following may not be written by an ordinary mutating skill during a run
+unless a current operator grant matches the proposal, base revision, lock digest,
+and exact paths. The protected list lives in `ourob.toml`:
 
 ```
 ourob.toml                 the configuration itself
@@ -23,29 +24,46 @@ src/ourob/policies/        the guardrails
 src/ourob/verify/          the gates
 ```
 
-`bootstrap.py` and `bootstrap.lock.json` are *additionally* hard-coded into the
-bootstrap script's own protected list. Removing them from `ourob.toml` does not
-unprotect them. There is no configuration that makes the bootstrap unable to
-defend itself.
+`.ourob` is non-amendable runtime state and is denied to ordinary mutating file
+skills. Child processes are separately denied content/namespace writes to
+`.ourob` and `.git` by the Linux filesystem boundary; this does not mediate
+file-mode or timestamp changes. `bootstrap.py` and `bootstrap.lock.json` are
+*additionally* hard-coded into the bootstrap script's own protected list.
+Removing them from `ourob.toml` does not unprotect them.
 
 ## Article 2 — Amendments
 
-An amendment is a record with an id, a path list, a rationale, a proposer and a
-status. It is opened with:
+An amendment proposal is a record with an id, a path list, a rationale, a
+proposer, a base revision, a base lock digest, and a status. It is opened with:
 
 ```bash
 python bootstrap.py amend src/ourob/policies/ --why "lower the retry threshold"
 ```
 
-or, from inside a run, with the `propose_amendment` skill — which is itself an
-ordinary skill subject to every other policy, and whose invocation is journalled.
+or, from inside a run, with the `propose_amendment` skill. The proposal skill
+creates a request; a proposal file by itself never grants authority.
 
-An amendment authorises *writes*. It does not accept anything. Statuses:
+A separate operator action is required:
 
-- `proposed` — writes to the named paths are now permitted during a run.
-- `ratified` — the amended tree passed the full verification suite and was
-  promoted. The lock was rewritten and the amendment closed.
-- `rejected` — verification failed, or the change was declined.
+```bash
+python bootstrap.py authorize <amendment-id> --by "operator identity"
+```
+
+The command requires an interactive terminal and an exact typed proposal ID. It
+shows and pins the proposal SHA-256, revision, lock digest, and paths, then
+records a separate `amendment.authorized` event in the system journal. The `--by`
+value is self-asserted, not cryptographic proof of a human identity. The grant is
+invalid if the proposal changes, the base revision or lock changes, the path set
+differs, history is corrupt, or the proposal has already reached a terminal state.
+
+Statuses:
+
+- `proposed` — a request only; it does not permit writes without a distinct valid
+  operator grant in system history.
+- `ratified` — the amended tree passed verification and promotion; evidence and a
+  terminal event close the grant.
+- `rejected` — verification failed, or the change was declined; the grant is
+  closed.
 
 An amendment's scope is exactly the paths it names. A directory pattern
 (`src/ourob/policies/`) covers everything under it and nothing beside it.
@@ -78,11 +96,20 @@ version of the runtime.
 
 ## Article 5 — History is not editable
 
-No skill may write to `.ourob/journal`, `.ourob/verify` or `.ourob/index.jsonl`.
-The journal is append-only and hash-chained, with a `.head` anchor so truncation
-is detectable as well as editing. `ourob journal --check` verifies every chain.
+Ordinary mutating file skills are denied access to `.ourob`, including run and
+system journals, `.head` anchors, promotion history, verification reports, and
+amendment proposals. Journal appends refuse corrupt chains; each JSONL file is
+hash-chained and has a `.head` anchor so tail truncation, deletion, malformed
+anchors, and content changes are detected. System-event replay also rejects
+impossible authorization and promotion transitions. `ourob journal --check`
+verifies these checks.
 
-If you need to correct the record, add to it.
+On supported Linux hosts, child processes and descendants receive a Landlock
+write boundary that excludes `.ourob`, `.git`, and configured protected paths;
+unsupported hosts refuse child execution. This is a narrow child-write control,
+not an OS-level security boundary against arbitrary in-process Python, a user
+with checkout access, or host-level tampering. If you need to correct the record,
+add to it.
 
 ## Article 6 — Escalation, never demotion
 

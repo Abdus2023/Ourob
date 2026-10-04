@@ -18,8 +18,19 @@ import pytest
 
 REAL_REPO = Path(__file__).resolve().parents[1]
 IGNORE = shutil.ignore_patterns(
-    ".git", ".ourob", "__pycache__", ".pytest_cache", "*.egg-info", "bootstrap.lock.json"
+    ".git",
+    ".ourob",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".coverage*",
+    "coverage",
+    "*.egg-info",
+    "bootstrap.lock.json",
 )
+
+
 
 SMOKE_TEST = '''\
 def test_the_runtime_still_boots():
@@ -87,5 +98,5 @@ def skill_ctx(repo: Path, store, config):
         repo=repo,
         run_id="test-run",
         store=store,
-        services={"config": config, "registry": reg, "amended_paths": []},
+        services={"config": config, "registry": reg},
     )
