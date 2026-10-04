@@ -1,20 +1,14 @@
 {
   "format": "ourob.bootstrap.lock/v1",
-  "version": 18,
-  "created_at": "2026-09-07T13:58:02Z",
-  "notes": "tests gate: count CPUs with sched_getaffinity and pass an explicit -n, because xdist 'auto' resolves to physical cores and silently runs one worker",
-  "digest": "d291d922d088765aa2f0e7c613de0ff79f98ae7a104ca38c357e4b633166dd0e",
+  "version": 19,
+  "created_at": "2026-10-04T11:29:34Z",
+  "notes": "document project structure and remove deferred CI workflow",
+  "digest": "afa6e23d4fa8cb9847f306066775b2fc0f484e8b241c18bdcae0b668f095f8c6",
   "files": [
     {
       "path": ".coverage",
       "sha256": "6f9984ef22e08cf4b214544d7d4f428b32c6a5214c832c29fb08c58e444fed8f",
       "size": 53248,
-      "protected": false
-    },
-    {
-      "path": ".github/workflows/ci.yml",
-      "sha256": "4cc484657c16650f790f9dc15b08ee8a13df12e4a9f2bb0f218fd813609a6dfa",
-      "size": 1649,
       "protected": false
     },
     {
@@ -25,8 +19,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "eb66149356d1008532209a29d593e45e5c2178adb62c76d89d7f751892599bc0",
-      "size": 11645,
+      "sha256": "0c4ac553b21004965d39ea9d24a3a4bdeaab1a904d0a4f092857c9d8e6a39d6e",
+      "size": 15687,
       "protected": false
     },
     {
