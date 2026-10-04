@@ -1,9 +1,9 @@
 {
   "format": "ourob.bootstrap.lock/v1",
-  "version": 19,
-  "created_at": "2026-10-04T11:29:34Z",
-  "notes": "document project structure and remove deferred CI workflow",
-  "digest": "afa6e23d4fa8cb9847f306066775b2fc0f484e8b241c18bdcae0b668f095f8c6",
+  "version": 21,
+  "created_at": "2026-10-04T13:39:13Z",
+  "notes": "docs: finalize evaluation report and evidence",
+  "digest": "5a49f3ad4cb2003828601e7c1419f59ee2fbec68d09c28f6622688503ad7e5c4",
   "files": [
     {
       "path": ".coverage",
@@ -39,6 +39,18 @@
       "path": "docs/CONSTITUTION.md",
       "sha256": "c8f61b985881130dbfae34ac322e261fca62564b6f39289061842dc25c7f2557",
       "size": 4824,
+      "protected": false
+    },
+    {
+      "path": "docs/Ourob-independent-evaluation-evidence.json",
+      "sha256": "bf4d52475045a24d4dede58b1efcdaa05a81c1f35ca67f094b26260d8bf1858f",
+      "size": 82999,
+      "protected": false
+    },
+    {
+      "path": "docs/Ourob-independent-evaluation.md",
+      "sha256": "d19eb4e122f8ed4096a9a82f92d627ae24a119b64668bedc3f751a35d12a74d9",
+      "size": 22149,
       "protected": false
     },
     {
