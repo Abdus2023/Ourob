@@ -1,0 +1,2038 @@
+{
+  "format": "ourob.capability-boundary-audit-evidence/v1",
+  "audit_id": "Ourob-CBA-v2-2026-10-04-d2cc4058",
+  "evaluation_date": "2026-10-04",
+  "repository": {
+    "github": "Abdus2023/Ourob",
+    "path": "/home/user/Ourob",
+    "branch": "arena/01a1070e-ourob",
+    "evaluated_revision": "d2cc40583946a649452ebc203c3662c97e6ddd3e",
+    "parent_revision": "b212a233ccca4cbafc6112928a3548aa35c4f7f3",
+    "working_tree_before_audit_artifacts": "clean Git porcelain; no source/test edits",
+    "taxonomy_note": "CB identifiers are defined by this audit, not upstream project identifiers."
+  },
+  "primary_status_vocabulary": [
+    "CONTROLLED",
+    "DETECTED_ONLY",
+    "UNCONTROLLED",
+    "NOT_OBSERVABLE",
+    "OUT_OF_SCOPE",
+    "UNTESTED"
+  ],
+  "assurance_distinctions": [
+    "Policy authorization is not capability containment.",
+    "Post-action journal/manifest/gate detection is not prevention.",
+    "A local hash chain is not an external trust anchor.",
+    "A narrow child filesystem rule is not general OS isolation."
+  ],
+  "environment": {
+    "os": "Linux x86_64",
+    "kernel": "6.1.158+",
+    "python": "CPython 3.11.2",
+    "uid": 1001,
+    "gid": 1001,
+    "landlock_available": true,
+    "landlock_abi": 2,
+    "verification_venv": "/tmp/ourob-clean-dev-venv",
+    "packages": {
+      "pytest": "9.1.1",
+      "pytest-xdist": "3.8.0",
+      "ruff": "0.16.10",
+      "httpx": "0.28.1"
+    },
+    "protected_config_paths": [
+      "ourob.toml",
+      "bootstrap.py",
+      "bootstrap.lock.json",
+      "src/ourob/bootstrap/",
+      "src/ourob/policies/",
+      "src/ourob/verify/"
+    ],
+    "child_additional_nonwritable_roots": [
+      ".ourob/",
+      ".git/"
+    ]
+  },
+  "baseline": {
+    "lock": {
+      "version": 30,
+      "file_count": 71,
+      "digest": "f7a673aedb75fb69661015cbc62c6ee580e15b1e198c724149cb6adb47ef8f98"
+    },
+    "strict_proof": {
+      "command": "/tmp/ourob-clean-dev-venv/bin/python bootstrap.py --prove --strict",
+      "result": "TRUSTED",
+      "lock_version": 30,
+      "file_count": 71
+    },
+    "verification_without_venv_path": {
+      "command": "bootstrap.py verify -v",
+      "gates_passed": 7,
+      "gates_total": 8,
+      "skipped": 1,
+      "skip_reason": "non-blocking Ruff gate skipped because ruff was not on PATH",
+      "tests_passed": 432
+    },
+    "complete_verification": {
+      "command": "PATH=/tmp/ourob-clean-dev-venv/bin:$PATH /tmp/ourob-clean-dev-venv/bin/python bootstrap.py verify -v",
+      "gates_passed": 8,
+      "gates_total": 8,
+      "failed": 0,
+      "skipped": 0,
+      "manifest_files": 71,
+      "tests_passed": 432,
+      "ruff": "passed",
+      "bootstrap_cold_start": "TRUSTED"
+    },
+    "retained_adversarial_tests": {
+      "result": "22 passed in 3.05s",
+      "files": [
+        "tests/test_child_boundary.py",
+        "tests/test_journal_boundary.py",
+        "selected authorization and discovery tests"
+      ]
+    },
+    "corrected_targeted_tests": {
+      "result": "6 passed",
+      "coverage": [
+        "protected mutation variants",
+        "protected config symlink",
+        "undeclared unusual path key",
+        "declared path confinement",
+        "protected read",
+        "state authorization-event operator scope"
+      ],
+      "note": "An earlier selector referenced a nonexistent node and ran zero tests; corrected before recording these six."
+    },
+    "ignored_runtime_state_note": "Git porcelain was clean. Ignored .ourob runtime files were not separately content-hashed before baseline verification and are outside tracked tree/lock identity."
+  },
+  "prior_evaluation": {
+    "remediation_status": "PARTIALLY_VERIFIED",
+    "report_sha256": "ae694134587d493e7260846496167589e4b3286bf612ba568b14fe72eb7b376b",
+    "evidence_sha256": "66b8d85f1e62d8a7c0aa128781551d873f0e80beb9aaa58652db6a39416d0d35",
+    "historical_result_001": {
+      "markdown_sha256": "d19eb4e122f8ed4096a9a82f92d627ae24a119b64668bedc3f751a35d12a74d9",
+      "evidence_sha256": "bf4d52475045a24d4dede58b1efcdaa05a81c1f35ca67f094b26260d8bf1858f",
+      "unchanged": true
+    },
+    "conclusion_handling": "Prior R-01..R-06 outcomes are preserved at their stated scope; this audit adds adversarial findings without rewriting prior documents."
+  },
+  "methodology": {
+    "probe_revision": "d2cc40583946a649452ebc203c3662c97e6ddd3e",
+    "probe_location": "Detached disposable clones under /tmp/ourob-cb-audit-*; no destructive probe on live protected artifacts.",
+    "source_review": [
+      "src/ourob/kernel.py",
+      "src/ourob/skills/base.py",
+      "src/ourob/skills/registry.py",
+      "src/ourob/skills/builtin/shell.py",
+      "src/ourob/child_sandbox.py",
+      "src/ourob/policies/rules.py",
+      "src/ourob/state/store.py",
+      "src/ourob/bootstrap/amend.py",
+      "README.md",
+      "docs/ARCHITECTURE.md"
+    ],
+    "probe_transcript_note": "Manual probe outcomes are recorded in this evidence; temporary clone console transcripts are not committed as separate files."
+  },
+  "challenge_schema": {
+    "version": "1.0",
+    "required_fields": [
+      "challenge_id",
+      "cb_id",
+      "name",
+      "scenario",
+      "requested",
+      "declared",
+      "granted",
+      "policy_checked",
+      "execution_interface",
+      "actual_operation",
+      "observed_effect",
+      "resource_before_after",
+      "journal_evidence",
+      "verification_evidence",
+      "negative_control",
+      "status",
+      "status_rationale",
+      "evidence_ids",
+      "test_environment",
+      "limitations"
+    ],
+    "per_record_rule": "Every challenge record has exactly one primary status from primary_status_vocabulary. NOT_OBSERVABLE is used for unestablished fields/results, not as a pass."
+  },
+  "capability_taxonomy": [
+    {
+      "cb_id": "CB-01",
+      "capability": "Read repository/protected/outside files",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw Python/child read synthetic /tmp, .ourob, and .git/HEAD; normal API confinement is route-specific.",
+      "evidence_ids": [
+        "EV-CHILD",
+        "EV-NORMAL"
+      ]
+    },
+    {
+      "cb_id": "CB-02",
+      "capability": "Protected content create/overwrite",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw in-process writes and child hardlink alias changed protected state.",
+      "evidence_ids": [
+        "EV-RAWOPS",
+        "EV-HARDLINK"
+      ]
+    },
+    {
+      "cb_id": "CB-03",
+      "capability": "Protected unlink/delete",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw in-process deletion succeeded.",
+      "evidence_ids": [
+        "EV-RAWOPS"
+      ]
+    },
+    {
+      "cb_id": "CB-04",
+      "capability": "Rename/replace/copy overwrite",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw rename/replace/copyfile overwrite/tempfile replacement succeeded; direct os.truncate was not tested.",
+      "evidence_ids": [
+        "EV-RAWOPS"
+      ]
+    },
+    {
+      "cb_id": "CB-05",
+      "capability": "Metadata, ownership, xattrs",
+      "primary_status": "UNCONTROLLED",
+      "basis": "In-process metadata and child chmod/utime succeeded; selected child chown/xattr denied.",
+      "evidence_ids": [
+        "EV-RAWOPS",
+        "EV-CHILD"
+      ]
+    },
+    {
+      "cb_id": "CB-06",
+      "capability": "Directory namespace",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw mkdir/rmdir and protected parent-directory move/write succeeded.",
+      "evidence_ids": [
+        "EV-RAWOPS",
+        "EV-DIRMOVE"
+      ]
+    },
+    {
+      "cb_id": "CB-07",
+      "capability": "Symlink/hardlink/inode aliases",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw links succeeded; pre-existing hardlink bypassed child boundary.",
+      "evidence_ids": [
+        "EV-RAWOPS",
+        "EV-HARDLINK"
+      ]
+    },
+    {
+      "cb_id": "CB-08",
+      "capability": "Run-journal records/appends",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw append possible; malformed append is detected after writing.",
+      "evidence_ids": [
+        "EV-JOURNAL"
+      ]
+    },
+    {
+      "cb_id": "CB-09",
+      "capability": "Journal anchors/index/head/re-chain",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Re-chained history and rewritten local head passed checks and replay.",
+      "evidence_ids": [
+        "EV-JOURNAL"
+      ]
+    },
+    {
+      "cb_id": "CB-10",
+      "capability": "Proposal/authorization artifacts",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw plugin wrote semantically accepted system grant/head.",
+      "evidence_ids": [
+        "EV-AUTH"
+      ]
+    },
+    {
+      "cb_id": "CB-11",
+      "capability": "Grant issuance/freshness/identity/scope",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Forged grant accepted; a 1900 timestamp was accepted.",
+      "evidence_ids": [
+        "EV-AUTH",
+        "EV-BACKDATE"
+      ]
+    },
+    {
+      "cb_id": "CB-12",
+      "capability": "Process creation/commands",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw plugin launched protected-writing subprocess; child code can spawn more processes.",
+      "evidence_ids": [
+        "EV-RAWPY",
+        "EV-CHDISP"
+      ]
+    },
+    {
+      "cb_id": "CB-13",
+      "capability": "Child/descendant inherited authority",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Children inherit selected write restrictions, not read/network restrictions; hardlink bypass reproduced.",
+      "evidence_ids": [
+        "EV-HARDLINK",
+        "EV-CHILD",
+        "EV-ENV"
+      ]
+    },
+    {
+      "cb_id": "CB-14",
+      "capability": "Environment and credentials",
+      "primary_status": "UNCONTROLLED",
+      "basis": "OUROB_API_KEY passed to child; same-process os.environ mutable.",
+      "evidence_ids": [
+        "EV-ENV",
+        "EV-RAWPY"
+      ]
+    },
+    {
+      "cb_id": "CB-15",
+      "capability": "Local socket creation/bind",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Standard child successfully bound loopback TCP.",
+      "evidence_ids": [
+        "EV-ENV"
+      ]
+    },
+    {
+      "cb_id": "CB-16",
+      "capability": "Git refs and .git",
+      "primary_status": "UNCONTROLLED",
+      "basis": "In-process update-ref succeeded; child equivalent denied.",
+      "evidence_ids": [
+        "EV-GIT"
+      ]
+    },
+    {
+      "cb_id": "CB-17",
+      "capability": "Alternate registry/API dispatch",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Direct dispatch outside Kernel wrote protected file.",
+      "evidence_ids": [
+        "EV-DISPATCH",
+        "EV-CHDISP"
+      ]
+    },
+    {
+      "cb_id": "CB-18",
+      "capability": "Raw Python/stdlib and undeclared parameters",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw stdlib bypassed helpers; undeclared unusual path key not confined.",
+      "evidence_ids": [
+        "EV-RAWOPS",
+        "EV-POLICY"
+      ]
+    },
+    {
+      "cb_id": "CB-19",
+      "capability": "Child filesystem boundary aggregate",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Canonical writes blocked, but metadata and hardlink bypass defeat aggregate claim.",
+      "evidence_ids": [
+        "EV-CHILD",
+        "EV-HARDLINK"
+      ]
+    },
+    {
+      "cb_id": "CB-20",
+      "capability": "Tempfile/atomic/path aliases",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw tempfile+replace succeeded; direct outside child write denied and scratch succeeded.",
+      "evidence_ids": [
+        "EV-RAWOPS",
+        "EV-TEMP",
+        "EV-HARDLINK"
+      ]
+    },
+    {
+      "cb_id": "CB-21",
+      "capability": "Import-time plugin execution",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Protected marker written during module import.",
+      "evidence_ids": [
+        "EV-RAWPY"
+      ]
+    },
+    {
+      "cb_id": "CB-22",
+      "capability": "Self-declared mutability/schema",
+      "primary_status": "UNCONTROLLED",
+      "basis": "mutating=false trusted; invalid schema executed after contract finding.",
+      "evidence_ids": [
+        "EV-RAWPY",
+        "EV-LIFE"
+      ]
+    },
+    {
+      "cb_id": "CB-23",
+      "capability": "Registry snapshot/freeze integrity",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Ordinary stale check works; private dict injection bypasses freeze.",
+      "evidence_ids": [
+        "EV-LIFE"
+      ]
+    },
+    {
+      "cb_id": "CB-24",
+      "capability": "Operation-level evidence completeness",
+      "primary_status": "UNCONTROLLED",
+      "basis": "Raw effects omitted from touched/artifacts; child only outer run_python logged.",
+      "evidence_ids": [
+        "EV-RAWPY",
+        "EV-CHDISP",
+        "EV-GIT"
+      ]
+    },
+    {
+      "cb_id": "CB-25",
+      "capability": "External/public network egress",
+      "primary_status": "OUT_OF_SCOPE",
+      "basis": "Project disclaims networking restrictions; remote egress not attempted.",
+      "evidence_ids": [
+        "EV-SCOPE"
+      ]
+    },
+    {
+      "cb_id": "CB-26",
+      "capability": "Process inspection/signals/ptrace",
+      "primary_status": "OUT_OF_SCOPE",
+      "basis": "Project disclaims general process inspection restrictions; not probed.",
+      "evidence_ids": [
+        "EV-SCOPE"
+      ]
+    },
+    {
+      "cb_id": "CB-27",
+      "capability": "Other OS/architecture/kernel behavior",
+      "primary_status": "UNTESTED",
+      "basis": "Only Linux x86_64, kernel 6.1.158+, Landlock ABI 2 exercised.",
+      "evidence_ids": [
+        "EV-SCOPE"
+      ]
+    }
+  ],
+  "enforcement_topology": {
+    "request": "Planner emits Invocation to Kernel.run; registry discovers Python modules and dispatches names.",
+    "declaration": "SkillSpec contains name, description, parameter hints, examples, and Boolean mutating; no mandatory per-resource capability handles.",
+    "grant": "Kernel policy verdict is route-level authorization. SkillContext exposes repository Path, StateStore and services; in-process skill keeps ambient UID authority.",
+    "policy_check": "Kernel._authorise checks declared invocation/context; direct registry dispatch, import side effects, raw Python/stdlib calls and raw subprocess are outside this per-operation check.",
+    "execution_interface": "Built-ins may use ctx.path/fsx; arbitrary plugin Python can use pathlib/os/shutil/tempfile/subprocess. run_command/run_python use run_child.",
+    "child_enforcement": "Linux Landlock ABI 2 selected content/namespace writes under protected paths/.ourob/.git and permits unprotected repository dirs plus per-call temp; seccomp denies selected ownership/xattr syscalls. Descendants inherit.",
+    "child_gaps": "Reads, network, general process inspection, chmod/time changes, and pre-existing hardlink aliases are not generally controlled; same UID remains.",
+    "journal": "Kernel logs decisions/results, but not each raw OS operation. State APIs have guarded writes/hash chains; same process can edit files and local head directly.",
+    "verification": "Manifest/journal/contracts/gates detect only specified conditions and may run after an effect; they are not a syscall broker or prevention layer.",
+    "actual_model": "Model D ambient authority for in-process plugins; narrow Model-A-like normal API authorization; partial Model-B-like child write boundary; no general Model C OS sandbox."
+  },
+  "challenges": [
+    {
+      "challenge_id": "CH-01",
+      "cb_id": "CB-02",
+      "related_cb_ids": [
+        "CB-02"
+      ],
+      "name": "Kernel protected write versus docs positive control",
+      "scenario": "Kernel protected write versus docs positive control",
+      "requested": "Planner/Kernel requested the named built-in skill operation.",
+      "declared": "Built-in SkillSpec declares its parameters and mutating flag.",
+      "granted": "Kernel supplies a route-level verdict, not an OS handle.",
+      "policy_checked": "Kernel._authorise/PolicySet checks declared arguments before dispatch.",
+      "execution_interface": "Kernel -> SkillRegistry.dispatch -> built-in skill.",
+      "actual_operation": "write_file to protected path denied; ordinary docs write succeeds and is reported.",
+      "observed_effect": "Protected fixture unchanged; docs file created and in run.touched.",
+      "resource_before_after": {
+        "before": "Protected target absent/known; docs target absent.",
+        "after": "Protected target unchanged; docs target present."
+      },
+      "journal_evidence": "Kernel decision/result recorded; exact run ID not retained.",
+      "verification_evidence": "Denied before protected target changed.",
+      "negative_control": "Docs success shows the route was functional.",
+      "status": "CONTROLLED",
+      "status_rationale": "This exact Kernel API route refused the protected write; it does not cover raw Python.",
+      "evidence_ids": [
+        "EV-NORMAL"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-02",
+      "cb_id": "CB-01",
+      "related_cb_ids": [
+        "CB-01"
+      ],
+      "name": "Normal API outside-repository read",
+      "scenario": "Normal API outside-repository read",
+      "requested": "Planner/Kernel requested the named built-in skill operation.",
+      "declared": "Built-in SkillSpec declares its parameters and mutating flag.",
+      "granted": "Kernel supplies a route-level verdict, not an OS handle.",
+      "policy_checked": "Kernel._authorise/PolicySet checks declared arguments before dispatch.",
+      "execution_interface": "Kernel -> SkillRegistry.dispatch -> built-in skill.",
+      "actual_operation": "read_file of a synthetic /tmp path.",
+      "observed_effect": "path-confinement denied the read; protected in-repo read was allowed in a separate control.",
+      "resource_before_after": {
+        "before": "Outside sentinel existed.",
+        "after": "No outside contents returned."
+      },
+      "journal_evidence": "Kernel route; exact run ID NOT_OBSERVABLE.",
+      "verification_evidence": "Declared path confinement observed.",
+      "negative_control": "Protected read control succeeded.",
+      "status": "CONTROLLED",
+      "status_rationale": "The declared built-in read route confines this tested outside path.",
+      "evidence_ids": [
+        "EV-NORMAL"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-03",
+      "cb_id": "CB-01",
+      "related_cb_ids": [
+        "CB-01"
+      ],
+      "name": "Child reads outside repo and protected runtime state",
+      "scenario": "Child reads outside repo and protected runtime state",
+      "requested": "Planner requested run_python; child snippet attempted the named operation.",
+      "declared": "run_python is a child-executing SkillSpec; snippet has no per-operation resource declaration.",
+      "granted": "Kernel allowed child execution because Landlock ABI 2 was available.",
+      "policy_checked": "Child Landlock covers selected writes only; seccomp denies selected metadata calls.",
+      "execution_interface": "run_child -> Python child -> requested Python/stdlib API.",
+      "actual_operation": "Read synthetic /tmp and .ourob files and .git/HEAD.",
+      "observed_effect": "Child returned all tested values; no file mutation required.",
+      "resource_before_after": {
+        "before": "Sentinels and .git/HEAD existed.",
+        "after": "Contents returned in child output."
+      },
+      "journal_evidence": "Outer run_python recorded; individual reads not journaled.",
+      "verification_evidence": "Landlock does not mediate reads.",
+      "negative_control": "Normal API outside read was denied.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Standard child raw reads bypass normal path-confinement and Landlock is write-only.",
+      "evidence_ids": [
+        "EV-CHILD"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-04",
+      "cb_id": "CB-02",
+      "related_cb_ids": [
+        "CB-02",
+        "CB-03",
+        "CB-04",
+        "CB-05",
+        "CB-06",
+        "CB-07",
+        "CB-20"
+      ],
+      "name": "Raw in-process filesystem operations",
+      "scenario": "Raw in-process filesystem operations",
+      "requested": "Planner invoked a discovered custom plugin; plugin attempted the named operation.",
+      "declared": "Plugin self-declared mutating=false; no mandatory capability manifest.",
+      "granted": "Plugin retains same-process UID 1001 authority.",
+      "policy_checked": "Policy treated it as read-only/allowed; no check on each OS operation.",
+      "execution_interface": "Skill.run in Kernel process -> Python/stdlib interface.",
+      "actual_operation": "Path/os/shutil/tempfile write, replace, unlink, mkdir/rmdir, symlink/link, copy, rename, chmod, utime, same-owner chown, setxattr.",
+      "observed_effect": "Operations reported success against disposable protected fixtures; touched/artifacts empty.",
+      "resource_before_after": {
+        "before": "Synthetic protected files/directories existed.",
+        "after": "Fixtures changed; per-operation hashes not retained."
+      },
+      "journal_evidence": "Outer skill result only; no per-operation journal; run ID NOT_OBSERVABLE.",
+      "verification_evidence": "No pre-operation prevention; later manifest detection was not a guard.",
+      "negative_control": "Normal API and canonical child controls show narrower layers work.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "The same-process plugin can bypass helpers using raw Python/stdlib APIs.",
+      "evidence_ids": [
+        "EV-RAWOPS"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": [
+        "Per-operation hash values were not retained for every fixture."
+      ]
+    },
+    {
+      "challenge_id": "CH-05",
+      "cb_id": "CB-07",
+      "related_cb_ids": [
+        "CB-07",
+        "CB-13",
+        "CB-19",
+        "CB-20"
+      ],
+      "name": "Kernel child write through a pre-existing hardlink",
+      "scenario": "Kernel child write through a pre-existing hardlink",
+      "requested": "Planner requested run_python; child snippet attempted the named operation.",
+      "declared": "run_python is a child-executing SkillSpec; snippet has no per-operation resource declaration.",
+      "granted": "Kernel allowed child execution because Landlock ABI 2 was available.",
+      "policy_checked": "Child Landlock covers selected writes only; seccomp denies selected metadata calls.",
+      "execution_interface": "run_child -> Python child -> requested Python/stdlib API.",
+      "actual_operation": "Write docs/cb-hardlink-alias.txt linked to protected src/ourob/policies/cb-hardlink-target.txt before sandbox setup.",
+      "observed_effect": "Child exit 0 changed protected target through alias; run.touched empty.",
+      "resource_before_after": {
+        "before": "Protected SHA 9e743905f6c0cf3e3c0af924367bc90316ebab148abe9d0d4d71234627bbd2b7.",
+        "after": "SHA 7c7b975481d02d4ad3c6a988bccb693197560f1cfd33dba157d3e2f7cf4c4fc2."
+      },
+      "journal_evidence": "Outer run_python only; journal chain intact; no operation event.",
+      "verification_evidence": "Actual protected inode content changed despite policy allow and intact chain.",
+      "negative_control": "Direct creation of a new cross-boundary hardlink was denied; alias pre-existed.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "A path-rooted write rule was bypassed through a real inode alias under writable docs/.",
+      "evidence_ids": [
+        "EV-HARDLINK"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-06",
+      "cb_id": "CB-19",
+      "related_cb_ids": [
+        "CB-19"
+      ],
+      "name": "Canonical child protected content/namespace denial",
+      "scenario": "Canonical child protected content/namespace denial",
+      "requested": "Planner requested run_python; child snippet attempted the named operation.",
+      "declared": "run_python is a child-executing SkillSpec; snippet has no per-operation resource declaration.",
+      "granted": "Kernel allowed child execution because Landlock ABI 2 was available.",
+      "policy_checked": "Child Landlock covers selected writes only; seccomp denies selected metadata calls.",
+      "execution_interface": "run_child -> Python child -> requested Python/stdlib API.",
+      "actual_operation": "Write/create/unlink/rename canonical protected paths without aliases.",
+      "observed_effect": "Tested operations failed EACCES/PermissionError(13); protected hashes unchanged.",
+      "resource_before_after": {
+        "before": "Known protected targets and docs control existed.",
+        "after": "Protected targets unchanged; docs control write succeeded."
+      },
+      "journal_evidence": "Kernel child case had valid outer journal; exact run ID not retained.",
+      "verification_evidence": "Denial occurred before tested content change.",
+      "negative_control": "Ordinary docs write succeeded; hardlink case is separate.",
+      "status": "CONTROLLED",
+      "status_rationale": "Canonical child content/namespace operations were blocked in this exact route.",
+      "evidence_ids": [
+        "EV-CHILD"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": [
+        "Does not cover metadata, reads, aliases, or in-process skills."
+      ]
+    },
+    {
+      "challenge_id": "CH-07",
+      "cb_id": "CB-05",
+      "related_cb_ids": [
+        "CB-05"
+      ],
+      "name": "Child chmod and utime of protected file",
+      "scenario": "Child chmod and utime of protected file",
+      "requested": "A disposable harness directly requested the child operation through run_child.",
+      "declared": "Child code is arbitrary Python; there is no app-level operation manifest.",
+      "granted": "Landlock/seccomp child restrictions apply only to their handled operations.",
+      "policy_checked": "Filesystem child boundary is installed before exec; no Kernel policy/journal.",
+      "execution_interface": "run_child -> child Python/stdlib or executable.",
+      "actual_operation": "os.chmod(target, 0600) and os.utime(target, ns=...)",
+      "observed_effect": "Both succeeded; content hash unchanged while mode and mtime changed; parent restored fixture.",
+      "resource_before_after": {
+        "before": "Protected fixture and original metadata inspected.",
+        "after": "Mode 0600 and requested mtime observed; restored in disposable parent."
+      },
+      "journal_evidence": "Standalone run_child; no Kernel journal.",
+      "verification_evidence": "Operation itself was not denied; retained regression asserts success.",
+      "negative_control": "Child chown/xattr were denied in same capability family.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Protected file metadata changed in child.",
+      "evidence_ids": [
+        "EV-CHILD"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-08",
+      "cb_id": "CB-05",
+      "related_cb_ids": [
+        "CB-05"
+      ],
+      "name": "Child chown/xattr denial control",
+      "scenario": "Child chown/xattr denial control",
+      "requested": "A disposable harness directly requested the child operation through run_child.",
+      "declared": "Child code is arbitrary Python; there is no app-level operation manifest.",
+      "granted": "Landlock/seccomp child restrictions apply only to their handled operations.",
+      "policy_checked": "Filesystem child boundary is installed before exec; no Kernel policy/journal.",
+      "execution_interface": "run_child -> child Python/stdlib or executable.",
+      "actual_operation": "Attempt same-owner chown and setxattr.",
+      "observed_effect": "Both failed EPERM in tested child.",
+      "resource_before_after": {
+        "before": "Protected fixture existed.",
+        "after": "Selected owner/xattr values unchanged."
+      },
+      "journal_evidence": "Standalone run_child; no Kernel journal.",
+      "verification_evidence": "Selected syscall filter returned EPERM.",
+      "negative_control": "chmod and utime succeeded, delimiting the filter.",
+      "status": "CONTROLLED",
+      "status_rationale": "Only the tested child ownership/xattr operations were refused.",
+      "evidence_ids": [
+        "EV-CHILD"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": [
+        "Not general metadata protection."
+      ]
+    },
+    {
+      "challenge_id": "CH-09",
+      "cb_id": "CB-08",
+      "related_cb_ids": [
+        "CB-08",
+        "CB-24"
+      ],
+      "name": "Malformed raw journal append",
+      "scenario": "Malformed raw journal append",
+      "requested": "Planner invoked a discovered custom plugin; plugin attempted the named operation.",
+      "declared": "Plugin self-declared mutating=false; no mandatory capability manifest.",
+      "granted": "Plugin retains same-process UID 1001 authority.",
+      "policy_checked": "Policy treated it as read-only/allowed; no check on each OS operation.",
+      "execution_interface": "Skill.run in Kernel process -> Python/stdlib interface.",
+      "actual_operation": "Append malformed bytes to prior run journal via raw file I/O.",
+      "observed_effect": "Append succeeded; later check_chain found unreadable JSON.",
+      "resource_before_after": {
+        "before": "Prior journal readable.",
+        "after": "Malformed trailing bytes present."
+      },
+      "journal_evidence": "Outer plugin result did not enumerate append.",
+      "verification_evidence": "Later detection only; write was not prevented.",
+      "negative_control": "Journal API mutation controls denied.",
+      "status": "DETECTED_ONLY",
+      "status_rationale": "Checker detected corruption after the write.",
+      "evidence_ids": [
+        "EV-JOURNAL"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-10",
+      "cb_id": "CB-09",
+      "related_cb_ids": [
+        "CB-09",
+        "CB-08"
+      ],
+      "name": "Re-chain modified journal and local head",
+      "scenario": "Re-chain modified journal and local head",
+      "requested": "Planner invoked a discovered custom plugin; plugin attempted the named operation.",
+      "declared": "Plugin self-declared mutating=false; no mandatory capability manifest.",
+      "granted": "Plugin retains same-process UID 1001 authority.",
+      "policy_checked": "Policy treated it as read-only/allowed; no check on each OS operation.",
+      "execution_interface": "Skill.run in Kernel process -> Python/stdlib interface.",
+      "actual_operation": "Rewrite prior run.started goal; recompute chain and .head.",
+      "observed_effect": "check_chain passed; replay returned forged goal; touched empty.",
+      "resource_before_after": {
+        "before": "Prior valid run journal/head.",
+        "after": "Forged goal and recomputed local head."
+      },
+      "journal_evidence": "Raw rewrite not a trusted append.",
+      "verification_evidence": "Hash-chain and replay checks accepted the forged state.",
+      "negative_control": "Malformed append was detected, showing checker executes but lacks provenance.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Same-privilege code can rewrite both records and local anchor.",
+      "evidence_ids": [
+        "EV-JOURNAL"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-11",
+      "cb_id": "CB-08",
+      "related_cb_ids": [
+        "CB-08",
+        "CB-09"
+      ],
+      "name": "Journal API and child mutation denial controls",
+      "scenario": "Journal API and child mutation denial controls",
+      "requested": "A disposable harness directly requested the child operation through run_child.",
+      "declared": "Child code is arbitrary Python; there is no app-level operation manifest.",
+      "granted": "Landlock/seccomp child restrictions apply only to their handled operations.",
+      "policy_checked": "Filesystem child boundary is installed before exec; no Kernel policy/journal.",
+      "execution_interface": "run_child -> child Python/stdlib or executable.",
+      "actual_operation": "Retained API/child attempts to mutate guarded journal/head/history/proposal targets.",
+      "observed_effect": "Enumerated operations denied; targets unchanged in tests.",
+      "resource_before_after": {
+        "before": "Test fixtures and hashes captured.",
+        "after": "No mutation in denied cases."
+      },
+      "journal_evidence": "22 retained adversarial tests passed overall; test_journal_boundary.py included.",
+      "verification_evidence": "Checks valid for enumerated APIs/child paths.",
+      "negative_control": "Raw append and re-chain are separate bypasses.",
+      "status": "CONTROLLED",
+      "status_rationale": "Exact guarded API/canonical child cases were refused.",
+      "evidence_ids": [
+        "EV-REGRESSIONS"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-12",
+      "cb_id": "CB-10",
+      "related_cb_ids": [
+        "CB-10",
+        "CB-11"
+      ],
+      "name": "Forged authorization event accepted and used",
+      "scenario": "Forged authorization event accepted and used",
+      "requested": "Planner invoked a discovered custom plugin; plugin attempted the named operation.",
+      "declared": "Plugin self-declared mutating=false; no mandatory capability manifest.",
+      "granted": "Plugin retains same-process UID 1001 authority.",
+      "policy_checked": "Policy treated it as read-only/allowed; no check on each OS operation.",
+      "execution_interface": "Skill.run in Kernel process -> Python/stdlib interface.",
+      "actual_operation": "Write semantically valid system authorized event/head for proposal, then normal Kernel protected write_file.",
+      "observed_effect": "authorising_id active; system checks passed; protected file created; actor attacker-controlled-label.",
+      "resource_before_after": {
+        "before": "Current proposal and no operator confirmation.",
+        "after": "Forged event/head and protected target present."
+      },
+      "journal_evidence": "System chain/semantics intact; outer run did not report mutation as touched/artifact.",
+      "verification_evidence": "Normal Kernel write accepted forged event as authority.",
+      "negative_control": "Normal API tests require separate operator-action confirmation.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Raw plugin wrote the local authority artifact and anchor; ledger accepted it.",
+      "evidence_ids": [
+        "EV-AUTH"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-13",
+      "cb_id": "CB-11",
+      "related_cb_ids": [
+        "CB-11"
+      ],
+      "name": "Backdated authorization accepted",
+      "scenario": "Backdated authorization accepted",
+      "requested": "Planner invoked a discovered custom plugin; plugin attempted the named operation.",
+      "declared": "Plugin self-declared mutating=false; no mandatory capability manifest.",
+      "granted": "Plugin retains same-process UID 1001 authority.",
+      "policy_checked": "Policy treated it as read-only/allowed; no check on each OS operation.",
+      "execution_interface": "Skill.run in Kernel process -> Python/stdlib interface.",
+      "actual_operation": "Forge valid event with ts=0, stamp=1900-01-01T00:00:00Z, exact current proposal fields.",
+      "observed_effect": "Grant active; system event semantics intact; proposal amd-20261004-185144-fdd0fab2.",
+      "resource_before_after": {
+        "before": "Current proposal, no grant.",
+        "after": "Backdated accepted grant auth-backdated-probe."
+      },
+      "journal_evidence": "Outer plugin run; exact run ID not material to acceptance.",
+      "verification_evidence": "authorising_id returned active; check_chain passed.",
+      "negative_control": "Normal API pins base revision/digest but no external clock/expiry.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "A semantically valid 1900 timestamp was accepted; no expiry trust was observed.",
+      "evidence_ids": [
+        "EV-BACKDATE"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-14",
+      "cb_id": "CB-23",
+      "related_cb_ids": [
+        "CB-23"
+      ],
+      "name": "Genuine new skill, stale versus fresh registry",
+      "scenario": "Genuine new skill, stale versus fresh registry",
+      "requested": "Probe added/injected a skill and requested listing or invocation.",
+      "declared": "SkillSpec/decorator metadata is loaded from contribution module.",
+      "granted": "Registry snapshot/freeze is an in-process object convention.",
+      "policy_checked": "Normal stale registry checks pending files; private dicts remain mutable.",
+      "execution_interface": "SkillRegistry discover/register/list/dispatch.",
+      "actual_operation": "Add absent contrib file; invoke via current and fresh registries.",
+      "observed_effect": "Stale registry pending/restart_required and refuses; fresh registry discovers and invokes.",
+      "resource_before_after": {
+        "before": "New skill absent at startup snapshot.",
+        "after": "Fresh snapshot executes synthetic output; stale snapshot unchanged."
+      },
+      "journal_evidence": "Registry probe; exact Kernel run IDs not retained.",
+      "verification_evidence": "Ordinary stale-file refusal observed.",
+      "negative_control": "Genuine file was newly created, not an existing example.",
+      "status": "CONTROLLED",
+      "status_rationale": "The ordinary stale registry path requires a fresh runtime.",
+      "evidence_ids": [
+        "EV-LIFE"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-15",
+      "cb_id": "CB-22",
+      "related_cb_ids": [
+        "CB-22"
+      ],
+      "name": "Invalid schema skill still runs",
+      "scenario": "Invalid schema skill still runs",
+      "requested": "Probe added/injected a skill and requested listing or invocation.",
+      "declared": "SkillSpec/decorator metadata is loaded from contribution module.",
+      "granted": "Registry snapshot/freeze is an in-process object convention.",
+      "policy_checked": "Normal stale registry checks pending files; private dicts remain mutable.",
+      "execution_interface": "SkillRegistry discover/register/list/dispatch.",
+      "actual_operation": "Invoke discovered skill declaring type not-a-real-type.",
+      "observed_effect": "Skill executed; SkillContractGate reported one contract problem.",
+      "resource_before_after": {
+        "before": "New module with invalid schema.",
+        "after": "Skill output returned; one contract finding."
+      },
+      "journal_evidence": "Outer Kernel result only.",
+      "verification_evidence": "Contract defect detected but not used as dispatch precondition.",
+      "negative_control": "Valid fresh skill also executed in lifecycle probe.",
+      "status": "DETECTED_ONLY",
+      "status_rationale": "Validation surfaced the issue without preventing invocation.",
+      "evidence_ids": [
+        "EV-LIFE"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-16",
+      "cb_id": "CB-17",
+      "related_cb_ids": [
+        "CB-17"
+      ],
+      "name": "Direct registry dispatch outside Kernel",
+      "scenario": "Direct registry dispatch outside Kernel",
+      "requested": "A caller directly requested the named registry/API operation outside Kernel.run.",
+      "declared": "Registry skill metadata exists; direct caller supplies SkillContext.",
+      "granted": "No Kernel authorization object is required for direct dispatch.",
+      "policy_checked": "Registry lookup/contract coercion only; no Kernel PolicySet check.",
+      "execution_interface": "Direct SkillRegistry.dispatch -> Skill.timed -> skill.",
+      "actual_operation": "Dispatch built-in write_file to protected path without Kernel.run.",
+      "observed_effect": "Protected target created without Kernel policy/journal.",
+      "resource_before_after": {
+        "before": "Target absent.",
+        "after": "Target present."
+      },
+      "journal_evidence": "NOT_OBSERVABLE: no Kernel journal exists for direct call.",
+      "verification_evidence": "Filesystem state checked after dispatch.",
+      "negative_control": "Normal Kernel route denied protected write.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Registry dispatch does not itself invoke Kernel PolicySet.",
+      "evidence_ids": [
+        "EV-DISPATCH"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-17",
+      "cb_id": "CB-23",
+      "related_cb_ids": [
+        "CB-23"
+      ],
+      "name": "Private registry injection after freeze",
+      "scenario": "Private registry injection after freeze",
+      "requested": "Probe added/injected a skill and requested listing or invocation.",
+      "declared": "SkillSpec/decorator metadata is loaded from contribution module.",
+      "granted": "Registry snapshot/freeze is an in-process object convention.",
+      "policy_checked": "Normal stale registry checks pending files; private dicts remain mutable.",
+      "execution_interface": "SkillRegistry discover/register/list/dispatch.",
+      "actual_operation": "After public register rejects, mutate _skills/_modules and invoke cb_memory_injected_20261004.",
+      "observed_effect": "Injected skill listed and ran; discovery still complete/no pending.",
+      "resource_before_after": {
+        "before": "Registry frozen; skill absent.",
+        "after": "Injected skill present/callable; snapshot unchanged."
+      },
+      "journal_evidence": "Outer Kernel invocation logged; exact ID not retained.",
+      "verification_evidence": "list_skills and invocation confirmed.",
+      "negative_control": "Public register raised SkillError after freeze.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Mutable same-process registry internals bypass the public freeze guard.",
+      "evidence_ids": [
+        "EV-LIFE"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-18",
+      "cb_id": "CB-21",
+      "related_cb_ids": [
+        "CB-21"
+      ],
+      "name": "Import-time protected side effect",
+      "scenario": "Import-time protected side effect",
+      "requested": "Planner invoked a discovered custom plugin; plugin attempted the named operation.",
+      "declared": "Plugin self-declared mutating=false; no mandatory capability manifest.",
+      "granted": "Plugin retains same-process UID 1001 authority.",
+      "policy_checked": "Policy treated it as read-only/allowed; no check on each OS operation.",
+      "execution_interface": "Skill.run in Kernel process -> Python/stdlib interface.",
+      "actual_operation": "Import new mutating=False contrib whose module top-level writes protected marker.",
+      "observed_effect": "Protected marker created before plan dispatch.",
+      "resource_before_after": {
+        "before": "Marker absent before fresh registry import.",
+        "after": "Marker present after module import."
+      },
+      "journal_evidence": "No per-operation event; import is outside Kernel step gate.",
+      "verification_evidence": "Marker independently inspected in disposable clone.",
+      "negative_control": "Normal skill dispatch controls are separate.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Python module import executes plugin code without operation mediation.",
+      "evidence_ids": [
+        "EV-RAWPY"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-19",
+      "cb_id": "CB-17",
+      "related_cb_ids": [
+        "CB-17",
+        "CB-19",
+        "CB-24"
+      ],
+      "name": "Child direct registry dispatch",
+      "scenario": "Child direct registry dispatch",
+      "requested": "Planner requested run_python; child snippet attempted the named operation.",
+      "declared": "run_python is a child-executing SkillSpec; snippet has no per-operation resource declaration.",
+      "granted": "Kernel allowed child execution because Landlock ABI 2 was available.",
+      "policy_checked": "Child Landlock covers selected writes only; seccomp denies selected metadata calls.",
+      "execution_interface": "run_child -> Python child -> requested Python/stdlib API.",
+      "actual_operation": "run_python child dispatches write_file to docs and canonical protected path.",
+      "observed_effect": "docs file created; protected write failed PermissionError while creating .ourob-tmp-*; outer touched empty.",
+      "resource_before_after": {
+        "before": "Both targets absent.",
+        "after": "docs present; protected absent/unchanged."
+      },
+      "journal_evidence": "Outer Kernel journal records run_python only; chain intact.",
+      "verification_evidence": "Landlock denied canonical protected child write.",
+      "negative_control": "docs write succeeded, proving child path active.",
+      "status": "CONTROLLED",
+      "status_rationale": "Canonical protected write was blocked despite bypassing per-dispatch Kernel policy.",
+      "evidence_ids": [
+        "EV-CHDISP"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-20",
+      "cb_id": "CB-14",
+      "related_cb_ids": [
+        "CB-14"
+      ],
+      "name": "Arbitrary child environment key filtered",
+      "scenario": "Arbitrary child environment key filtered",
+      "requested": "Planner requested run_python; child snippet attempted the named operation.",
+      "declared": "run_python is a child-executing SkillSpec; snippet has no per-operation resource declaration.",
+      "granted": "Kernel allowed child execution because Landlock ABI 2 was available.",
+      "policy_checked": "Child Landlock covers selected writes only; seccomp denies selected metadata calls.",
+      "execution_interface": "run_child -> Python child -> requested Python/stdlib API.",
+      "actual_operation": "Standard child reads synthetic CB_AUDIT_PRIVATE.",
+      "observed_effect": "Key absent from child environment.",
+      "resource_before_after": {
+        "before": "Parent contained synthetic key.",
+        "after": "Child returned absent."
+      },
+      "journal_evidence": "Outer run_python only.",
+      "verification_evidence": "Child output verified key absent.",
+      "negative_control": "OUROB_API_KEY was explicitly present in another control.",
+      "status": "CONTROLLED",
+      "status_rationale": "Only this arbitrary non-allowlisted key was filtered.",
+      "evidence_ids": [
+        "EV-ENV"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-21",
+      "cb_id": "CB-14",
+      "related_cb_ids": [
+        "CB-14"
+      ],
+      "name": "OUROB_API_KEY reaches child code",
+      "scenario": "OUROB_API_KEY reaches child code",
+      "requested": "Planner requested run_python; child snippet attempted the named operation.",
+      "declared": "run_python is a child-executing SkillSpec; snippet has no per-operation resource declaration.",
+      "granted": "Kernel allowed child execution because Landlock ABI 2 was available.",
+      "policy_checked": "Child Landlock covers selected writes only; seccomp denies selected metadata calls.",
+      "execution_interface": "run_child -> Python child -> requested Python/stdlib API.",
+      "actual_operation": "Standard run_python reads synthetic OUROB_API_KEY.",
+      "observed_effect": "shell._child_env deliberately carries the key if present.",
+      "resource_before_after": {
+        "before": "No separate credential capability required.",
+        "after": "No secret broker; child receives key in environment."
+      },
+      "journal_evidence": "os.environ inside child.",
+      "verification_evidence": "Synthetic key returned in output.",
+      "negative_control": "Parent environment mutation remains process-local.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Selected credential is visible to arbitrary child code; external use not tested.",
+      "evidence_ids": [
+        "EV-ENV"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-22",
+      "cb_id": "CB-14",
+      "related_cb_ids": [
+        "CB-14"
+      ],
+      "name": "In-process environment mutation",
+      "scenario": "In-process environment mutation",
+      "requested": "Planner invoked a discovered custom plugin; plugin attempted the named operation.",
+      "declared": "Plugin self-declared mutating=false; no mandatory capability manifest.",
+      "granted": "Plugin retains same-process UID 1001 authority.",
+      "policy_checked": "Policy treated it as read-only/allowed; no check on each OS operation.",
+      "execution_interface": "Skill.run in Kernel process -> Python/stdlib interface.",
+      "actual_operation": "Plugin assigns synthetic key in os.environ.",
+      "observed_effect": "Skill declares mutating=false; process env shared with later code.",
+      "resource_before_after": {
+        "before": "No environment capability check.",
+        "after": "No environment guard."
+      },
+      "journal_evidence": "os.environ assignment in Skill.run.",
+      "verification_evidence": "Mutation visible within probe process.",
+      "negative_control": "Child-local env mutation did not affect parent in separate-process control.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "In-process plugin can mutate runtime-global environment.",
+      "evidence_ids": [
+        "EV-RAWPY"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-23",
+      "cb_id": "CB-12",
+      "related_cb_ids": [
+        "CB-12",
+        "CB-13"
+      ],
+      "name": "Raw plugin subprocess writes protected fixture",
+      "scenario": "Raw plugin subprocess writes protected fixture",
+      "requested": "Planner invoked a discovered custom plugin; plugin attempted the named operation.",
+      "declared": "Plugin self-declared mutating=false; no mandatory capability manifest.",
+      "granted": "Plugin retains same-process UID 1001 authority.",
+      "policy_checked": "Policy treated it as read-only/allowed; no check on each OS operation.",
+      "execution_interface": "Skill.run in Kernel process -> Python/stdlib interface.",
+      "actual_operation": "Plugin launches Python subprocess without run_child; subprocess writes protected file.",
+      "observed_effect": "Subprocess exited and wrote target.",
+      "resource_before_after": {
+        "before": "Protected fixture existed.",
+        "after": "Protected fixture changed."
+      },
+      "journal_evidence": "Kernel logged plugin result only; no child operation event.",
+      "verification_evidence": "Target inspected after call.",
+      "negative_control": "Standard run_python child uses Landlock; this raw subprocess is a different path.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Raw subprocess from parent is not automatically subject to child wrapper controls.",
+      "evidence_ids": [
+        "EV-RAWPY"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-24",
+      "cb_id": "CB-15",
+      "related_cb_ids": [
+        "CB-15"
+      ],
+      "name": "Child loopback socket bind",
+      "scenario": "Child loopback socket bind",
+      "requested": "Planner requested run_python; child snippet attempted the named operation.",
+      "declared": "run_python is a child-executing SkillSpec; snippet has no per-operation resource declaration.",
+      "granted": "Kernel allowed child execution because Landlock ABI 2 was available.",
+      "policy_checked": "Child Landlock covers selected writes only; seccomp denies selected metadata calls.",
+      "execution_interface": "run_child -> Python child -> requested Python/stdlib API.",
+      "actual_operation": "socket.socket().bind((127.0.0.1,0)).",
+      "observed_effect": "Bind succeeded; ephemeral local port returned; socket closed on exit.",
+      "resource_before_after": {
+        "before": "No socket.",
+        "after": "Local socket created and closed."
+      },
+      "journal_evidence": "Outer run_python only.",
+      "verification_evidence": "Local bind success observed; no remote egress test.",
+      "negative_control": "Filesystem restrictions remained separately active.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "The child filesystem boundary does not block tested local socket creation.",
+      "evidence_ids": [
+        "EV-ENV"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-25",
+      "cb_id": "CB-25",
+      "related_cb_ids": [
+        "CB-25"
+      ],
+      "name": "Public network egress",
+      "scenario": "Public network egress",
+      "requested": "NOT_OBSERVABLE: no operation was requested or exercised.",
+      "declared": "Source documentation describes the non-claim.",
+      "granted": "No relevant grant/control claim.",
+      "policy_checked": "No runtime policy test was performed.",
+      "execution_interface": "No execution interface exercised.",
+      "actual_operation": "No public/remote connection was attempted.",
+      "observed_effect": "Repository explicitly says networking is not restricted.",
+      "resource_before_after": {
+        "before": "No egress grant/control claim.",
+        "after": "No runtime test."
+      },
+      "journal_evidence": "No interface exercised.",
+      "verification_evidence": "NOT_OBSERVABLE: no remote request.",
+      "negative_control": "Loopback bind is not a remote reachability test.",
+      "status": "OUT_OF_SCOPE",
+      "status_rationale": "External networking is an explicit non-claim and remained untested.",
+      "evidence_ids": [
+        "EV-SCOPE"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-26",
+      "cb_id": "CB-16",
+      "related_cb_ids": [
+        "CB-16"
+      ],
+      "name": "In-process git update-ref",
+      "scenario": "In-process git update-ref",
+      "requested": "Planner invoked a discovered custom plugin; plugin attempted the named operation.",
+      "declared": "Plugin self-declared mutating=false; no mandatory capability manifest.",
+      "granted": "Plugin retains same-process UID 1001 authority.",
+      "policy_checked": "Policy treated it as read-only/allowed; no check on each OS operation.",
+      "execution_interface": "Skill.run in Kernel process -> Python/stdlib interface.",
+      "actual_operation": "git update-ref refs/heads/ourob-capability-audit-probe HEAD.",
+      "observed_effect": "Exit 0; disposable ref present; policies allowed; touched empty.",
+      "resource_before_after": {
+        "before": "Ref absent.",
+        "after": "Ref present in disposable .git."
+      },
+      "journal_evidence": "Outer Kernel run only; no Git operation event.",
+      "verification_evidence": "git show-ref confirmed.",
+      "negative_control": "Child equivalent ref update failed.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Same-process plugin retained ambient write access to .git.",
+      "evidence_ids": [
+        "EV-GIT"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-27",
+      "cb_id": "CB-16",
+      "related_cb_ids": [
+        "CB-16"
+      ],
+      "name": "Child git update-ref denial",
+      "scenario": "Child git update-ref denial",
+      "requested": "A disposable harness directly requested the child operation through run_child.",
+      "declared": "Child code is arbitrary Python; there is no app-level operation manifest.",
+      "granted": "Landlock/seccomp child restrictions apply only to their handled operations.",
+      "policy_checked": "Filesystem child boundary is installed before exec; no Kernel policy/journal.",
+      "execution_interface": "run_child -> child Python/stdlib or executable.",
+      "actual_operation": "git update-ref creates .git/refs/heads/...lock.",
+      "observed_effect": "Git returned 128; lock creation Permission denied; ref absent.",
+      "resource_before_after": {
+        "before": "Ref absent.",
+        "after": "Ref absent after attempt."
+      },
+      "journal_evidence": "Standalone child; no Kernel journal.",
+      "verification_evidence": "Git error and absent ref confirmed.",
+      "negative_control": "In-process control successfully created a ref.",
+      "status": "CONTROLLED",
+      "status_rationale": "The tested child ref mutation was blocked under Landlock.",
+      "evidence_ids": [
+        "EV-GIT"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-28",
+      "cb_id": "CB-20",
+      "related_cb_ids": [
+        "CB-20"
+      ],
+      "name": "Outside /tmp write denied; child scratch succeeds",
+      "scenario": "Outside /tmp write denied; child scratch succeeds",
+      "requested": "A disposable harness directly requested the child operation through run_child.",
+      "declared": "Child code is arbitrary Python; there is no app-level operation manifest.",
+      "granted": "Landlock/seccomp child restrictions apply only to their handled operations.",
+      "policy_checked": "Filesystem child boundary is installed before exec; no Kernel policy/journal.",
+      "execution_interface": "run_child -> child Python/stdlib or executable.",
+      "actual_operation": "Write fixed /tmp sentinel then tempfile.NamedTemporaryFile.",
+      "observed_effect": "Fixed write PermissionError(13); scratch write succeeded below /tmp/ourob-child-.../tmp; scratch root removed.",
+      "resource_before_after": {
+        "before": "Outside path absent; sandbox scratch created.",
+        "after": "Outside path absent; scratch root absent after return."
+      },
+      "journal_evidence": "Standalone run_child; no Kernel journal.",
+      "verification_evidence": "Errno 13 and cleanup observed.",
+      "negative_control": "Scratch write succeeded to validate allowed temp root.",
+      "status": "CONTROLLED",
+      "status_rationale": "The exact outside write was denied and scratch was cleaned after child exit.",
+      "evidence_ids": [
+        "EV-TEMP"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-29",
+      "cb_id": "CB-18",
+      "related_cb_ids": [
+        "CB-18"
+      ],
+      "name": "Undeclared unusual path key",
+      "scenario": "Undeclared unusual path key",
+      "requested": "Planner/Kernel requested the named built-in skill operation.",
+      "declared": "Built-in SkillSpec declares its parameters and mutating flag.",
+      "granted": "Kernel supplies a route-level verdict, not an OS handle.",
+      "policy_checked": "Kernel._authorise/PolicySet checks declared arguments before dispatch.",
+      "execution_interface": "Kernel -> SkillRegistry.dispatch -> built-in skill.",
+      "actual_operation": "Retained policy test supplies path-like value under undeclared unusual argument key.",
+      "observed_effect": "No schema declaration marks key as resource path.",
+      "resource_before_after": {
+        "before": "Policy cannot infer it as a path capability.",
+        "after": "No confinement applied to that key."
+      },
+      "journal_evidence": "PolicyContext argument inspection.",
+      "verification_evidence": "Test asserts unusual key is not confined.",
+      "negative_control": "Declared path confinement and normal outside read test passed.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Path completeness depends on explicit declarations; unusual undeclared key bypasses inference.",
+      "evidence_ids": [
+        "EV-POLICY"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-30",
+      "cb_id": "CB-24",
+      "related_cb_ids": [
+        "CB-24"
+      ],
+      "name": "Raw effects absent from touched/artifacts",
+      "scenario": "Raw effects absent from touched/artifacts",
+      "requested": "Planner invoked a discovered custom plugin; plugin attempted the named operation.",
+      "declared": "Plugin self-declared mutating=false; no mandatory capability manifest.",
+      "granted": "Plugin retains same-process UID 1001 authority.",
+      "policy_checked": "Policy treated it as read-only/allowed; no check on each OS operation.",
+      "execution_interface": "Skill.run in Kernel process -> Python/stdlib interface.",
+      "actual_operation": "Compare actual filesystem/Git effects with Kernel touched/artifact reporting.",
+      "observed_effect": "OS operations occur outside broker; skill result self-reports artifacts.",
+      "resource_before_after": {
+        "before": "No operation observer.",
+        "after": "Raw fixture/ref changed while touched/artifacts empty."
+      },
+      "journal_evidence": "Kernel run logs invocation/result only.",
+      "verification_evidence": "Independent clone inspection observed state.",
+      "negative_control": "Normal builtin docs write appears in touched.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Run report is not complete OS-operation telemetry for arbitrary skills.",
+      "evidence_ids": [
+        "EV-RAWOPS"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-31",
+      "cb_id": "CB-26",
+      "related_cb_ids": [
+        "CB-26"
+      ],
+      "name": "Process inspection/signals/ptrace",
+      "scenario": "Process inspection/signals/ptrace",
+      "requested": "NOT_OBSERVABLE: no operation was requested or exercised.",
+      "declared": "Source documentation describes the non-claim.",
+      "granted": "No relevant grant/control claim.",
+      "policy_checked": "No runtime policy test was performed.",
+      "execution_interface": "No execution interface exercised.",
+      "actual_operation": "No process inspection, signal, ptrace, or cross-process /proc test.",
+      "observed_effect": "Source explicitly disclaims general process inspection restriction.",
+      "resource_before_after": {
+        "before": "No relevant control claim.",
+        "after": "Not tested."
+      },
+      "journal_evidence": "No interface exercised.",
+      "verification_evidence": "NOT_OBSERVABLE.",
+      "negative_control": "Child filesystem tests are not process-isolation tests.",
+      "status": "OUT_OF_SCOPE",
+      "status_rationale": "The project disclaims this property and the audit did not probe it.",
+      "evidence_ids": [
+        "EV-SCOPE"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-32",
+      "cb_id": "CB-27",
+      "related_cb_ids": [
+        "CB-27"
+      ],
+      "name": "Other platform/architecture behavior",
+      "scenario": "Other platform/architecture behavior",
+      "requested": "NOT_OBSERVABLE: no operation was requested or exercised.",
+      "declared": "Source documentation describes the non-claim.",
+      "granted": "No relevant grant/control claim.",
+      "policy_checked": "No runtime policy test was performed.",
+      "execution_interface": "No execution interface exercised.",
+      "actual_operation": "Only Linux x86_64, kernel 6.1.158+, Landlock ABI 2 was tested.",
+      "observed_effect": "Source says child code fails closed without required support.",
+      "resource_before_after": {
+        "before": "No alternate-host grant or result.",
+        "after": "No alternate-host runtime test."
+      },
+      "journal_evidence": "No alternate interface exercised.",
+      "verification_evidence": "NOT_OBSERVABLE on other platforms.",
+      "negative_control": "Current host Landlock availability was observed.",
+      "status": "UNTESTED",
+      "status_rationale": "Cross-platform behavior was not exercised; static code is not runtime evidence.",
+      "evidence_ids": [
+        "EV-SCOPE"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    },
+    {
+      "challenge_id": "CH-33",
+      "cb_id": "CB-06",
+      "related_cb_ids": [
+        "CB-06"
+      ],
+      "name": "Protected parent-directory move and write-through",
+      "scenario": "Protected parent-directory move and write-through",
+      "requested": "Planner invoked a discovered custom plugin; plugin attempted the named operation.",
+      "declared": "Plugin self-declared mutating=false; no mandatory capability manifest.",
+      "granted": "Plugin retains same-process UID 1001 authority.",
+      "policy_checked": "Policy treated it as read-only/allowed; no check on each OS operation.",
+      "execution_interface": "Skill.run in Kernel process -> Python/stdlib interface.",
+      "actual_operation": "os.rename protected src/ourob/policies/cb-parent-move-probe into docs/, write marker through moved directory, rename it back.",
+      "observed_effect": "Skill returned success; parent path was restored; marker changed; touched/artifacts empty.",
+      "resource_before_after": {
+        "before": "Protected fixture directory/marker existed.",
+        "after": "Original parent restored; destination absent; marker contents changed."
+      },
+      "journal_evidence": "Outer Kernel run only; no per-operation event; exact run ID not retained.",
+      "verification_evidence": "Source/destination and marker checked after the operation.",
+      "negative_control": "This was a real protected parent directory moved into writable docs and then restored, not a mocked path check.",
+      "status": "UNCONTROLLED",
+      "status_rationale": "Raw in-process code moved a protected parent namespace into an allowed directory and wrote through it.",
+      "evidence_ids": [
+        "EV-DIRMOVE"
+      ],
+      "test_environment": "Disposable clone at d2cc40583946a649452ebc203c3662c97e6ddd3e; Linux x86_64, kernel 6.1.158+, CPython 3.11.2, UID/GID 1001, Landlock ABI 2.",
+      "limitations": []
+    }
+  ],
+  "evidence_register": [
+    {
+      "evidence_id": "EV-BASELINE",
+      "kind": "baseline identity/verification",
+      "source": "/tmp/ourob-capability-boundary-baseline.txt",
+      "method": "Captured revision, branch, Git porcelain, environment, lock, strict proof, full verification, packages, and prior hashes before edits.",
+      "observed_result": "HEAD d2cc40583946a649452ebc203c3662c97e6ddd3e; clean Git state; lock v30/71/digest f7a673...; strict TRUSTED; complete verify 8/8 and 432 tests.",
+      "limitations": [
+        "Ignored .ourob runtime data was not separately content-hashed."
+      ]
+    },
+    {
+      "evidence_id": "EV-NORMAL",
+      "kind": "normal API controls",
+      "source": "/tmp/ourob-cb-audit-child-dispatch (detached clone)",
+      "method": "Kernel write_file/read_file calls to protected, docs, and /tmp synthetic paths.",
+      "observed_result": "Protected write denied; docs write allowed and touched; protected read allowed; outside read denied.",
+      "limitations": [
+        "Only normal built-in API routes."
+      ]
+    },
+    {
+      "evidence_id": "EV-CHILD",
+      "kind": "child filesystem/read/metadata",
+      "source": "/tmp/ourob-capability-audit-current and tests/test_child_boundary.py",
+      "method": "Direct run_child and Kernel child probes for canonical content, metadata, read paths, symlinks, and ordinary-write controls.",
+      "observed_result": "Canonical content/namespace denied; chmod/utime succeed; chown/xattr EPERM; child reads tested /tmp/.ourob/.git.",
+      "limitations": [
+        "Linux x86_64, kernel 6.1.158+, ABI 2 only."
+      ]
+    },
+    {
+      "evidence_id": "EV-HARDLINK",
+      "kind": "end-to-end child hardlink bypass",
+      "source": "/tmp/ourob-cb-audit-hardlink (detached clone)",
+      "method": "Precreate hardlink from protected policy fixture to docs; Kernel run_python writes alias.",
+      "observed_result": "Protected hash 9e743905f6c0cf3e3c0af924367bc90316ebab148abe9d0d4d71234627bbd2b7 -> 7c7b975481d02d4ad3c6a988bccb693197560f1cfd33dba157d3e2f7cf4c4fc2; rc=0; touched empty; journal intact.",
+      "limitations": [
+        "Alias deliberately created before sandbox in disposable tree."
+      ]
+    },
+    {
+      "evidence_id": "EV-RAWOPS",
+      "kind": "raw Python/stdlib operations",
+      "source": "/tmp/ourob-cb-audit-rawops",
+      "method": "mutating=False plugin invokes direct Path/os/shutil/tempfile operations on protected fixtures.",
+      "observed_result": "Write/replace/delete/mkdir/rmdir/link/copy/rename/metadata calls succeeded; policy said read-only; touched/artifacts empty.",
+      "limitations": [
+        "Per-operation hashes were not retained for every fixture."
+      ]
+    },
+    {
+      "evidence_id": "EV-RAWPY",
+      "kind": "in-process/import/env/subprocess/journal",
+      "source": "/tmp/ourob-cb-audit-rawpy",
+      "method": "Import and invoke mutating=False plugin using raw Python, subprocess, environment, .git and journal file writes.",
+      "observed_result": "Import marker, protected/.git writes, env mutation, unsandboxed child write, malformed append; no per-operation touched/artifact records.",
+      "limitations": [
+        "All actions were in disposable clone."
+      ]
+    },
+    {
+      "evidence_id": "EV-DIRMOVE",
+      "kind": "protected parent directory move",
+      "source": "/tmp/ourob-cb-audit-rawops",
+      "method": "Kernel invokes mutating=False plugin that renames protected policies/cb-parent-move-probe into docs, writes marker, then restores parent.",
+      "observed_result": "Source directory restored; docs destination absent; marker changed; touched/artifacts empty.",
+      "limitations": [
+        "Disposable clone only."
+      ]
+    },
+    {
+      "evidence_id": "EV-JOURNAL",
+      "kind": "journal append and full re-chain",
+      "source": "/tmp/ourob-cb-audit-rawpy",
+      "method": "Append malformed bytes in one probe; rewrite prior goal, recompute chain/head in another.",
+      "observed_result": "Malformed append detected later; re-chained edited history/head passed check_chain and replay consumed forged goal.",
+      "limitations": [
+        "No external trust anchor was present/tested."
+      ]
+    },
+    {
+      "evidence_id": "EV-AUTH",
+      "kind": "forged authorization acceptance",
+      "source": "/tmp/ourob-cb-audit-authforge",
+      "method": "Plugin writes semantically valid amendment.authorized event/head without authorize/confirmation, then normal protected write.",
+      "observed_result": "Ledger accepted attacker-controlled-label; system checks passed; authorising_id active; protected write allowed.",
+      "limitations": [
+        "Disposable clone."
+      ]
+    },
+    {
+      "evidence_id": "EV-BACKDATE",
+      "kind": "backdated grant",
+      "source": "/tmp/ourob-cb-audit-timegrant",
+      "method": "Forge valid event with ts=0/stamp 1900-01-01 plus matching proposal/path/base fields and head.",
+      "observed_result": "Active grant accepted; system semantics intact; proposal amd-20261004-185144-fdd0fab2.",
+      "limitations": [
+        "Proves this timestamp shape only."
+      ]
+    },
+    {
+      "evidence_id": "EV-LIFE",
+      "kind": "new skill discovery/contract/freeze",
+      "source": "/tmp/ourob-cb-audit-lifecycle",
+      "method": "Create genuine new skill; compare stale/fresh registry; invalid schema; public freeze and private dict injection.",
+      "observed_result": "Stale pending/restart_required; fresh executes; invalid schema executes despite one gate finding; public register rejects; private injection runs cb_memory_injected_20261004.",
+      "limitations": [
+        "Flat contrib path and tested internals."
+      ]
+    },
+    {
+      "evidence_id": "EV-DISPATCH",
+      "kind": "direct registry dispatch",
+      "source": "/tmp/ourob-cb-audit-lifecycle",
+      "method": "Call SkillRegistry.dispatch(write_file, context) outside Kernel for protected target.",
+      "observed_result": "Protected file created without Kernel policy/journal.",
+      "limitations": [
+        "Specific direct dispatch."
+      ]
+    },
+    {
+      "evidence_id": "EV-CHDISP",
+      "kind": "child direct dispatch",
+      "source": "/tmp/ourob-cb-audit-child-dispatch",
+      "method": "Kernel run_python child constructs registry; dispatches write_file to docs/protected.",
+      "observed_result": "docs created; canonical protected write PermissionError at .ourob-tmp; outer run_python only; touched empty; chain intact.",
+      "limitations": [
+        "Does not cover pre-existing alias."
+      ]
+    },
+    {
+      "evidence_id": "EV-ENV",
+      "kind": "child env/socket",
+      "source": "/tmp/ourob-cb-audit-child-dispatch",
+      "method": "Inspect synthetic key allowlist, read API key, bind loopback, mutate child env.",
+      "observed_result": "OUROB_API_KEY visible; arbitrary CB_AUDIT_PRIVATE absent; loopback bind succeeds; child env mutation not in parent.",
+      "limitations": [
+        "No remote egress test."
+      ]
+    },
+    {
+      "evidence_id": "EV-GIT",
+      "kind": "Git differential",
+      "source": "/tmp/ourob-cb-audit-git",
+      "method": "In-process plugin and child each run disposable git update-ref.",
+      "observed_result": "Parent ref created, all policies allowed/touched empty; child denied at .git ref lock.",
+      "limitations": [
+        "Disposable refs only."
+      ]
+    },
+    {
+      "evidence_id": "EV-TEMP",
+      "kind": "child temp/outside path",
+      "source": "/tmp/ourob-capability-audit-current",
+      "method": "run_child writes fixed /tmp path then tempfile in redirected scratch.",
+      "observed_result": "Fixed outside write PermissionError(13); temp succeeds under /tmp/ourob-child-.../tmp; scratch removed.",
+      "limitations": [
+        "Direct run_child only."
+      ]
+    },
+    {
+      "evidence_id": "EV-POLICY",
+      "kind": "path declaration regression",
+      "source": "corrected targeted pytest run",
+      "method": "Test declared path confinement, symlink/config, protected read, unusual undeclared key, state authorization scope.",
+      "observed_result": "Six targeted tests passed; unusual undeclared path key is not confined.",
+      "limitations": [
+        "Finite tests only."
+      ]
+    },
+    {
+      "evidence_id": "EV-REGRESSIONS",
+      "kind": "retained adversarial regressions",
+      "source": "tests/test_child_boundary.py; tests/test_journal_boundary.py; selected authorization/discovery tests",
+      "method": "Run 22 retained adversarial tests before repository edits.",
+      "observed_result": "22 passed in 3.05s.",
+      "limitations": [
+        "Does not establish universal containment."
+      ]
+    },
+    {
+      "evidence_id": "EV-SCOPE",
+      "kind": "explicit non-claims",
+      "source": "src/ourob/child_sandbox.py; README.md; docs/ARCHITECTURE.md",
+      "method": "Inspect project statement on child read/network/process scope; no public egress or ptrace test.",
+      "observed_result": "General OS sandbox, reads, networking, and process inspection restrictions disclaimed.",
+      "limitations": [
+        "Documentation is not runtime evidence for untested operations."
+      ]
+    },
+    {
+      "evidence_id": "EV-PRIOR",
+      "kind": "prior report preservation",
+      "source": "docs/Ourob-remediation-evaluation*.md/json and Result 001 artifacts",
+      "method": "Hash/inspect old docs before adding new audit files.",
+      "observed_result": "Prior remediation PARTIALLY_VERIFIED; old hashes preserved.",
+      "limitations": [
+        "Prior narrow claims retained as written."
+      ]
+    },
+    {
+      "evidence_id": "EV-FINAL",
+      "kind": "frozen final artifact verification",
+      "source": "bootstrap.lock.json and final audit artifact",
+      "method": "Run strict proof and complete documented verification after v31 lock rebuild.",
+      "observed_result": "TRUSTED; lock v31/73 files; 8/8 gates; 432 tests; Ruff and bootstrap cold start pass.",
+      "limitations": [
+        "Repository/test evidence only, not capability containment."
+      ]
+    }
+  ],
+  "negative_controls": [
+    {
+      "control_id": "NC-01",
+      "control": "Protected Kernel write denied vs docs write allowed",
+      "observed": "Both observed; docs appeared in touched.",
+      "demonstrates": "Normal policy route active; not raw Python containment.",
+      "evidence_ids": [
+        "EV-NORMAL"
+      ]
+    },
+    {
+      "control_id": "NC-02",
+      "control": "Outside normal read denied vs protected in-repo read",
+      "observed": "Outside /tmp denied; protected rules.py read allowed.",
+      "demonstrates": "Declared API path confinement is distinct from child/raw reads.",
+      "evidence_ids": [
+        "EV-NORMAL"
+      ]
+    },
+    {
+      "control_id": "NC-03",
+      "control": "Canonical child protected write denied vs docs write",
+      "observed": "Canonical denied, docs allowed; preexisting hardlink changed protected inode.",
+      "demonstrates": "Landlock active; path/inode limitation real.",
+      "evidence_ids": [
+        "EV-CHILD",
+        "EV-HARDLINK"
+      ]
+    },
+    {
+      "control_id": "NC-04",
+      "control": "Child metadata syscall split",
+      "observed": "chown/xattr EPERM; chmod/utime succeeded.",
+      "demonstrates": "Selected filter scope and gap.",
+      "evidence_ids": [
+        "EV-CHILD"
+      ]
+    },
+    {
+      "control_id": "NC-05",
+      "control": "State APIs vs raw journal writes",
+      "observed": "API/child controls denied; malformed append and re-chain bypassed.",
+      "demonstrates": "API denial is not journal immutability.",
+      "evidence_ids": [
+        "EV-JOURNAL",
+        "EV-REGRESSIONS"
+      ]
+    },
+    {
+      "control_id": "NC-06",
+      "control": "Normal amendment API vs forged event",
+      "observed": "Normal API tests pass; raw forged event accepted.",
+      "demonstrates": "Ledger logic depends on trusted input store.",
+      "evidence_ids": [
+        "EV-AUTH",
+        "EV-BACKDATE"
+      ]
+    },
+    {
+      "control_id": "NC-07",
+      "control": "Stale/fresh registry and public freeze",
+      "observed": "Stale refusal/fresh discovery/public register rejection; private mutation succeeds.",
+      "demonstrates": "Public guard is not object immutability.",
+      "evidence_ids": [
+        "EV-LIFE"
+      ]
+    },
+    {
+      "control_id": "NC-08",
+      "control": "Child environment allowlist",
+      "observed": "Unknown key filtered; OUROB_API_KEY passed.",
+      "demonstrates": "Selective environment, but credential reaches arbitrary child code.",
+      "evidence_ids": [
+        "EV-ENV"
+      ]
+    },
+    {
+      "control_id": "NC-09",
+      "control": "Child scratch root vs outside /tmp",
+      "observed": "Outside errno 13; scratch write succeeded and was cleaned.",
+      "demonstrates": "Scratch routing works; not general isolation.",
+      "evidence_ids": [
+        "EV-TEMP"
+      ]
+    },
+    {
+      "control_id": "NC-10",
+      "control": "Parent vs child Git update-ref",
+      "observed": "Parent ref created; child ref denied.",
+      "demonstrates": "Boundary applies only to selected child path.",
+      "evidence_ids": [
+        "EV-GIT"
+      ]
+    },
+    {
+      "control_id": "NC-11",
+      "control": "Raw plugin effect vs run report",
+      "observed": "Real fixture/ref effects with empty touched/artifacts.",
+      "demonstrates": "Probe executed; run report is not syscall telemetry.",
+      "evidence_ids": [
+        "EV-RAWOPS",
+        "EV-RAWPY"
+      ]
+    }
+  ],
+  "alternate_execution_paths": [
+    {
+      "path": "Kernel.run -> _authorise -> registry dispatch",
+      "enforcement": "Policy verdict and journal before declared skill.",
+      "observed_result": "Narrow built-in controls; not raw containment.",
+      "evidence_ids": [
+        "EV-NORMAL"
+      ]
+    },
+    {
+      "path": "Direct SkillRegistry.dispatch outside Kernel",
+      "enforcement": "Lookup/coercion only; no Kernel PolicySet.",
+      "observed_result": "Protected write succeeded.",
+      "evidence_ids": [
+        "EV-DISPATCH"
+      ]
+    },
+    {
+      "path": "Module import/discovery",
+      "enforcement": "No per-import operation gate.",
+      "observed_result": "Protected marker written before plan dispatch.",
+      "evidence_ids": [
+        "EV-RAWPY"
+      ]
+    },
+    {
+      "path": "Raw Path/os/shutil/tempfile in Skill.run",
+      "enforcement": "Same-process ambient UID; helpers optional.",
+      "observed_result": "Protected operations succeeded.",
+      "evidence_ids": [
+        "EV-RAWOPS"
+      ]
+    },
+    {
+      "path": "Raw subprocess from in-process plugin",
+      "enforcement": "Not routed through run_child.",
+      "observed_result": "Subprocess wrote protected fixture.",
+      "evidence_ids": [
+        "EV-RAWPY"
+      ]
+    },
+    {
+      "path": "run_python child direct registry dispatch",
+      "enforcement": "No per-dispatch Kernel check; Landlock canonical write rules apply.",
+      "observed_result": "docs write allowed; canonical protected denied; hardlink bypass in separate run.",
+      "evidence_ids": [
+        "EV-CHDISP",
+        "EV-HARDLINK"
+      ]
+    },
+    {
+      "path": "Raw local journal/system/head writes",
+      "enforcement": "API guards bypassed; files and local anchor same trust domain.",
+      "observed_result": "Forged grant/re-chained history accepted.",
+      "evidence_ids": [
+        "EV-JOURNAL",
+        "EV-AUTH"
+      ]
+    },
+    {
+      "path": "Git update-ref parent versus child",
+      "enforcement": "Child .git writes excluded; parent not restricted.",
+      "observed_result": "Parent ref created; child denied.",
+      "evidence_ids": [
+        "EV-GIT"
+      ]
+    },
+    {
+      "path": "Environment/socket inside child",
+      "enforcement": "Selected environment allowlist; no network deny rule.",
+      "observed_result": "API key visible; local bind succeeded.",
+      "evidence_ids": [
+        "EV-ENV"
+      ]
+    }
+  ],
+  "findings_R01_R06": {
+    "R-01": {
+      "prior_status": "PARTIALLY_VERIFIED",
+      "prior_scope": "Normal file-skill denials and selected child content/namespace denials; prior chmod/utime gap preserved.",
+      "v2_observation": "Pre-existing hardlink alias changed protected inode through Kernel run_python; raw in-process operations also succeeded.",
+      "expanded_assessment": "Broad protected-path mutation is UNCONTROLLED; only exact canonical child cases are CONTROLLED.",
+      "evidence_ids": [
+        "EV-CHILD",
+        "EV-HARDLINK",
+        "EV-RAWOPS"
+      ]
+    },
+    "R-02": {
+      "prior_status": "PARTIALLY_VERIFIED",
+      "prior_scope": "API-mediated and tested child journal paths denied; raw in-process writer already outside claim.",
+      "v2_observation": "Malformed append detected after write; re-chained modified history/head passed checks and replay consumed forged goal.",
+      "expanded_assessment": "Same-process journal containment is UNCONTROLLED; malformed append subcase is DETECTED_ONLY.",
+      "evidence_ids": [
+        "EV-JOURNAL",
+        "EV-REGRESSIONS"
+      ]
+    },
+    "R-03": {
+      "prior_status": "PROVED for named application ledger/API checks only",
+      "prior_scope": "Separate operator-action checks, proposal digest/path/base revision/lock digest; no cryptographic identity claim.",
+      "v2_observation": "Raw plugin forged accepted event/head and used it for protected write; backdated timestamp accepted.",
+      "expanded_assessment": "Narrow normal API conclusion preserved; general inability of plugin to issue authority is UNCONTROLLED.",
+      "evidence_ids": [
+        "EV-AUTH",
+        "EV-BACKDATE",
+        "EV-PRIOR"
+      ]
+    },
+    "R-04": {
+      "prior_status": "PROVED for flat contrib discovery path tested",
+      "prior_scope": "Stale discovery reports pending/restart_required; fresh registry discovers and invokes a new skill.",
+      "v2_observation": "Invalid schema executed; import side effects and private dict injection bypassed protections.",
+      "expanded_assessment": "Narrow ordinary lifecycle conclusion preserved; registry integrity against same-process plugin is UNCONTROLLED; contract issue is DETECTED_ONLY.",
+      "evidence_ids": [
+        "EV-LIFE",
+        "EV-RAWPY"
+      ]
+    },
+    "R-05": {
+      "prior_status": "PROVED for Python 3.11.2/Linux x86_64 and documented [dev] install",
+      "prior_scope": "Prior report documents fresh dev environment and 432-test suite.",
+      "v2_observation": "Fresh package installation was not repeated; baseline and final configured verification ran 432 tests.",
+      "expanded_assessment": "No new package installation claim beyond prior scope.",
+      "evidence_ids": [
+        "EV-BASELINE",
+        "EV-PRIOR",
+        "EV-FINAL"
+      ]
+    },
+    "R-06": {
+      "prior_status": "PROVED for the specific new-skill verification/promotion route in prior report",
+      "prior_scope": "Prior report documents a genuinely new skill, configured gates, promotion and matching digests.",
+      "v2_observation": "This audit independently found genuine new-skill discovery/invocation in fresh registry, plus import/contract/private-registry bypasses.",
+      "expanded_assessment": "Prior narrow promotion result preserved; it does not establish runtime confinement or operation-level evidence completeness.",
+      "evidence_ids": [
+        "EV-LIFE",
+        "EV-PRIOR"
+      ]
+    }
+  },
+  "limitations": [
+    "No public/remote egress was attempted.",
+    "No ptrace, process inspection, signal, cross-process /proc, namespace or mount probes.",
+    "No non-Linux, other architecture, or alternate Landlock ABI execution.",
+    "Synthetic fixtures only; no unrelated user secrets were read.",
+    "No concurrent TOCTOU stress test; hardlink alias was deliberately pre-created.",
+    "Some raw operation fixtures have no retained per-operation hash; no missing digest is invented.",
+    "Interactive terminal authorization was not manually driven; source and retained tests support normal API route, separate from forged-event probe.",
+    "No claim against checkout owner, kernel administrator, compromised host, or general same-user adversary."
+  ],
+  "os_isolation_boundary": {
+    "project_explicitly_disclaims": [
+      "general OS sandbox",
+      "read restrictions",
+      "network restrictions",
+      "general process inspection restrictions",
+      "privilege separation"
+    ],
+    "observed_supporting_facts": [
+      "Child ran as UID 1001.",
+      "Child read tested /tmp, .ourob, and .git/HEAD.",
+      "Child received synthetic OUROB_API_KEY.",
+      "Child bound a loopback socket.",
+      "Protected mode/time operations succeeded.",
+      "Raw in-process code changed protected files and Git metadata."
+    ],
+    "claim": "No general OS isolation is established or endorsed."
+  },
+  "final_conclusion": {
+    "assessment": "FAILED for general capability containment; PARTIALLY CONTROLLED for specific mediated routes.",
+    "primary_status": "UNCONTROLLED",
+    "basis": [
+      "In-process plugins have ambient Python/OS authority and can bypass Kernel policy.",
+      "A real pre-existing hardlink alias bypassed child Landlock and changed a protected inode.",
+      "Local journal/head could be re-chained; replay accepted modified content.",
+      "Forged authorization artifacts were accepted, including a backdated event.",
+      "Normal API, canonical child write, selected child metadata, and scratch controls do work in their stated routes."
+    ],
+    "required_rule": "NO EVIDENCE → NO VERIFIED CLAIM"
+  },
+  "architectural_recommendations": [
+    {
+      "priority": "P0",
+      "action": "Treat plugin Python as hostile: isolate each skill under a separate unprivileged worker/broker and do not pass raw repo Path, StateStore, mutable registry, or ambient credentials."
+    },
+    {
+      "priority": "P0",
+      "action": "Separate writable and protected inodes with a separate filesystem/mount or isolated worktree; test and prevent pre-existing hardlink aliases, not just link creation after Landlock."
+    },
+    {
+      "priority": "P0",
+      "action": "Close child metadata gaps with strong privilege separation/read-only mounts or a reviewed syscall policy that also denies protected chmod/time changes."
+    },
+    {
+      "priority": "P1",
+      "action": "Move journals/anchors outside the writer trust domain; use broker-owned append-only storage and an external signature/MAC key or independently protected monotonic anchor."
+    },
+    {
+      "priority": "P1",
+      "action": "Authenticate operator identity out of process; bind a grant to a nonce, expiry, exact operation/content digest, paths, repository identity, and one run."
+    },
+    {
+      "priority": "P1",
+      "action": "Replace Boolean mutating metadata with a validated capability manifest; enforce schema/path declaration before dispatch and at an operation broker."
+    },
+    {
+      "priority": "P1",
+      "action": "Make discovery immutable and side-effect-safe; do not import untrusted modules in privileged registry; publish immutable snapshots and avoid mutable internals as a security boundary."
+    },
+    {
+      "priority": "P2",
+      "action": "Remove API keys from arbitrary skill child environments; use a scoped credential broker. Add network deny-by-default only if required, then test actual egress."
+    },
+    {
+      "priority": "P2",
+      "action": "Derive touched paths and journal events from the enforcing broker/monitor rather than skill-reported artifacts; distinguish attempted, denied, completed and later detected effects."
+    }
+  ],
+  "final_verification": {
+    "source_revision": "d2cc40583946a649452ebc203c3662c97e6ddd3e",
+    "strict_proof": {
+      "command": "/tmp/ourob-clean-dev-venv/bin/python bootstrap.py --prove --strict",
+      "result": "TRUSTED",
+      "lock_version": 31,
+      "files": 73,
+      "digest_reference": "See bootstrap.lock.json; not duplicated because this evidence file is included in the lock manifest."
+    },
+    "complete_verification": {
+      "command": "PATH=/tmp/ourob-clean-dev-venv/bin:$PATH /tmp/ourob-clean-dev-venv/bin/python bootstrap.py verify -v",
+      "gates_passed": 8,
+      "gates_total": 8,
+      "failed": 0,
+      "skipped": 0,
+      "tests_passed": 432,
+      "ruff": "passed",
+      "bootstrap_cold_start": "TRUSTED",
+      "gates": [
+        "policy-integrity",
+        "skill-contract",
+        "compile",
+        "import",
+        "manifest",
+        "lint",
+        "tests",
+        "bootstrap"
+      ]
+    },
+    "tree_delta": [
+      "docs/Ourob-capability-boundary-audit.md",
+      "docs/Ourob-capability-boundary-audit-evidence.json",
+      "bootstrap.lock.json"
+    ],
+    "source_and_tests_changed": false,
+    "capability_security_claim": "Verification success does not alter audit findings."
+  },
+  "release_identity": {
+    "audited_code_revision": "d2cc40583946a649452ebc203c3662c97e6ddd3e",
+    "branch": "arena/01a1070e-ourob",
+    "final_lock_version": 31,
+    "final_lock_file_count": 73,
+    "final_lock_digest_reference": "bootstrap.lock.json; deliberately not duplicated in manifest-covered evidence",
+    "report_path": "docs/Ourob-capability-boundary-audit.md",
+    "report_sha256": "5ba2a3bc4d14f902b07bb9efbf49f3ce3b0d0712c0c7f7b94733838808590904",
+    "evidence_path": "docs/Ourob-capability-boundary-audit-evidence.json",
+    "evidence_sha256_location": "bootstrap.lock.json file entry",
+    "containing_commit_hash_embedded": false,
+    "commit_note": "Commit hash is provided in delivery record rather than embedded in self-referential report/evidence."
+  }
+}

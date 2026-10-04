@@ -1,9 +1,9 @@
 {
   "format": "ourob.bootstrap.lock/v1",
-  "version": 30,
-  "created_at": "2026-10-04T18:19:34Z",
-  "notes": "Exact Result 001 baseline reproduction and R-01 through R-06 evaluation",
-  "digest": "f7a673aedb75fb69661015cbc62c6ee580e15b1e198c724149cb6adb47ef8f98",
+  "version": 31,
+  "created_at": "2026-10-04T19:05:21Z",
+  "notes": "Capability boundary audit v2 at d2cc40583946a649452ebc203c3662c97e6ddd3e",
+  "digest": "dad7209cc00fec9d1ad87dcca44039be9d7c0171d2d42bb2a0069ff73a71d0cc",
   "files": [
     {
       "path": ".gitignore",
@@ -33,6 +33,18 @@
       "path": "docs/CONSTITUTION.md",
       "sha256": "fab2fef05899886ef47f57486b662bf4e846483aec4c0e029ba0c5fb52bf963b",
       "size": 6333,
+      "protected": false
+    },
+    {
+      "path": "docs/Ourob-capability-boundary-audit-evidence.json",
+      "sha256": "e5b04985128161d665cc3e9fe3d9787c4995c85ece3866c278931a4102693f9d",
+      "size": 96014,
+      "protected": false
+    },
+    {
+      "path": "docs/Ourob-capability-boundary-audit.md",
+      "sha256": "5ba2a3bc4d14f902b07bb9efbf49f3ce3b0d0712c0c7f7b94733838808590904",
+      "size": 39721,
       "protected": false
     },
     {
