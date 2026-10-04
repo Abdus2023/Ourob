@@ -1,56 +1,86 @@
 {
   "format": "ourob.bootstrap.lock/v1",
-  "version": 19,
-  "created_at": "2026-10-04T11:29:34Z",
-  "notes": "document project structure and remove deferred CI workflow",
-  "digest": "afa6e23d4fa8cb9847f306066775b2fc0f484e8b241c18bdcae0b668f095f8c6",
+  "version": 31,
+  "created_at": "2026-10-04T19:05:21Z",
+  "notes": "Capability boundary audit v2 at d2cc40583946a649452ebc203c3662c97e6ddd3e",
+  "digest": "dad7209cc00fec9d1ad87dcca44039be9d7c0171d2d42bb2a0069ff73a71d0cc",
   "files": [
     {
-      "path": ".coverage",
-      "sha256": "6f9984ef22e08cf4b214544d7d4f428b32c6a5214c832c29fb08c58e444fed8f",
-      "size": 53248,
-      "protected": false
-    },
-    {
       "path": ".gitignore",
-      "sha256": "2b0bbb329fadd3271ead2446c1341afd42655620acf112dbc3781fa86ef272cc",
-      "size": 71,
+      "sha256": "47172509739ea009bacbcc742f64e9148d9cf9c59bf03a5219051fa4fe9b8274",
+      "size": 92,
       "protected": false
     },
     {
       "path": "README.md",
-      "sha256": "0c4ac553b21004965d39ea9d24a3a4bdeaab1a904d0a4f092857c9d8e6a39d6e",
-      "size": 15687,
+      "sha256": "f217b40df2aa749f32a9014cb4e83bd7b741345270472a6cd49f0b121e4f6c2e",
+      "size": 17312,
       "protected": false
     },
     {
       "path": "bootstrap.py",
-      "sha256": "410e5ff8d82f2beb69803a77a9d4bc369a27aab7ce73945f20537c94822a5d17",
-      "size": 10670,
+      "sha256": "78f03f739a17905f8cca84a89c626f2f3294a6151adcab2d46c77ea4f8cf6f0f",
+      "size": 10822,
       "protected": true
     },
     {
       "path": "docs/ARCHITECTURE.md",
-      "sha256": "ea0b921cfbaa79baaf95a34805696057722e8bf2f7547fd68c03a532f3a6bf39",
-      "size": 8942,
+      "sha256": "0a8e752531050e41f82bfd0fcd4eddeecd4ee6634ce41e8754d2a01e2d86b9a5",
+      "size": 10237,
       "protected": false
     },
     {
       "path": "docs/CONSTITUTION.md",
-      "sha256": "c8f61b985881130dbfae34ac322e261fca62564b6f39289061842dc25c7f2557",
-      "size": 4824,
+      "sha256": "fab2fef05899886ef47f57486b662bf4e846483aec4c0e029ba0c5fb52bf963b",
+      "size": 6333,
+      "protected": false
+    },
+    {
+      "path": "docs/Ourob-capability-boundary-audit-evidence.json",
+      "sha256": "e5b04985128161d665cc3e9fe3d9787c4995c85ece3866c278931a4102693f9d",
+      "size": 96014,
+      "protected": false
+    },
+    {
+      "path": "docs/Ourob-capability-boundary-audit.md",
+      "sha256": "5ba2a3bc4d14f902b07bb9efbf49f3ce3b0d0712c0c7f7b94733838808590904",
+      "size": 39721,
+      "protected": false
+    },
+    {
+      "path": "docs/Ourob-independent-evaluation-evidence.json",
+      "sha256": "bf4d52475045a24d4dede58b1efcdaa05a81c1f35ca67f094b26260d8bf1858f",
+      "size": 82999,
+      "protected": false
+    },
+    {
+      "path": "docs/Ourob-independent-evaluation.md",
+      "sha256": "d19eb4e122f8ed4096a9a82f92d627ae24a119b64668bedc3f751a35d12a74d9",
+      "size": 22149,
+      "protected": false
+    },
+    {
+      "path": "docs/Ourob-remediation-evaluation-evidence.json",
+      "sha256": "66b8d85f1e62d8a7c0aa128781551d873f0e80beb9aaa58652db6a39416d0d35",
+      "size": 57937,
+      "protected": false
+    },
+    {
+      "path": "docs/Ourob-remediation-evaluation.md",
+      "sha256": "ae694134587d493e7260846496167589e4b3286bf612ba568b14fe72eb7b376b",
+      "size": 16177,
       "protected": false
     },
     {
       "path": "ourob.toml",
-      "sha256": "2ea65c695a5981c5106957d1eefb4eeeb249ae2de260717cca7ea587628ab1a6",
-      "size": 1215,
+      "sha256": "921bcec313bfd7be55171601fa70ba9da23d4033dcc09ddffc11d4e05a4a158b",
+      "size": 1181,
       "protected": true
     },
     {
       "path": "plans/amend_policy.json",
-      "sha256": "bc8fa881ed88a2a23eb839970274144c6763e53fcbc7dfec43d0e4b421c6a10f",
-      "size": 1133,
+      "sha256": "ce1ffc511e59d8278990284747fd226411ec35f2a365104b10df2da366ab33d3",
+      "size": 1125,
       "protected": false
     },
     {
@@ -67,14 +97,14 @@
     },
     {
       "path": "plans/self_extend.json",
-      "sha256": "26d1c50186b50cd8efd5628e15c89b2d6b35574ac82c31da7e43985d5e491bc9",
-      "size": 3404,
+      "sha256": "ba304ae0964e7ce0e12f7f93e737ae02ee00c205b06373f99f8c3a0c81802ef9",
+      "size": 3579,
       "protected": false
     },
     {
       "path": "pyproject.toml",
-      "sha256": "7827729b06676f505e420a8b8d0e98752c5cacc6d0f158e4d79230d3e4f1f8aa",
-      "size": 1245,
+      "sha256": "314b0d38a6b42f6b809861c225675139b00d11528be7e667bdf1e03097fd70ab",
+      "size": 1260,
       "protected": false
     },
     {
@@ -91,26 +121,26 @@
     },
     {
       "path": "src/ourob/bootstrap/amend.py",
-      "sha256": "ea98473cf9c21fa4df2f4767e691d82f83c7db22f30dae41cb69efa8f846be53",
-      "size": 6054,
+      "sha256": "23381c207f79403c8acce45556d724fe5ea2d36d5d5aa85852573c9bc3b11efe",
+      "size": 25183,
       "protected": true
     },
     {
       "path": "src/ourob/bootstrap/coldstart.py",
-      "sha256": "93cacd267c2cd7477a01251b61ff7cd96f275cb3b4e9ef4e66663a9c83b7f113",
-      "size": 6049,
+      "sha256": "e7859b34c53718874e2f5ce552974c8c4fd16d3a2a0b9e6a551aca4dc4e0d7b3",
+      "size": 6130,
       "protected": true
     },
     {
       "path": "src/ourob/bootstrap/manifest.py",
-      "sha256": "78a5691b51c98c6b7e9d98b889680b1a5ce0fb26e61e198a05573d5671663a82",
-      "size": 7030,
+      "sha256": "38fbe756ad80bec907ac083cbc0456268dd9baff8d93cd71a43ec2944fc0915e",
+      "size": 7028,
       "protected": true
     },
     {
       "path": "src/ourob/bootstrap/promote.py",
-      "sha256": "29b3713340827b2b8c401db5e8ff2b8950d54664dbb038c0776d2ffe2d01a047",
-      "size": 10422,
+      "sha256": "05e0d712b1bb9d0daf16f9c1da33a8d1fe8e212e184b71f2b0b6d3952023949e",
+      "size": 13062,
       "protected": true
     },
     {
@@ -120,9 +150,15 @@
       "protected": true
     },
     {
+      "path": "src/ourob/child_sandbox.py",
+      "sha256": "8dd1e17e084c0b666ed70b47c477b565c895132d99b13e8e6a45f389fda3e827",
+      "size": 16438,
+      "protected": false
+    },
+    {
       "path": "src/ourob/cli.py",
-      "sha256": "f9556369c2672b0157c3db167e49411fba4a62722d05685a1c9dc0e63f61bc65",
-      "size": 22920,
+      "sha256": "ffd6d6b8ee665e198f63b110734fea8f4105f09c112cf77182f2a2eca8650e1b",
+      "size": 25005,
       "protected": false
     },
     {
@@ -133,26 +169,26 @@
     },
     {
       "path": "src/ourob/config.py",
-      "sha256": "e6639439c7e84f4cca70aa891063fbe3e21073d74e867e8f5f781c82b576c61e",
-      "size": 7725,
+      "sha256": "dc3a06cfbe07adc085d2b88b8f8552db031d3ce0115b4165fcc6072554448d38",
+      "size": 7680,
       "protected": false
     },
     {
       "path": "src/ourob/errors.py",
-      "sha256": "4a5f6ac748b459635926641dad32ca23b0bacf2e092a33c9831c9869a3a8be32",
-      "size": 1657,
+      "sha256": "33e0a42ae00b3e65ca5b85b97a7bfa61fb1f7f2a451f54a206a091981f136e7d",
+      "size": 1668,
       "protected": false
     },
     {
       "path": "src/ourob/fsx.py",
-      "sha256": "f665f615c263a9ff54486e2996f99dfa5a26e24e9512576519dff97fde3c8bdb",
-      "size": 3939,
+      "sha256": "9995ea5e17d2aa48e397320a1d582e6e21d8cda139d091a77a4bcba90be95b00",
+      "size": 4095,
       "protected": false
     },
     {
       "path": "src/ourob/kernel.py",
-      "sha256": "72f3b948358e01c3a4d42b28df84e4a149d8df2fb04b597b483881221da28527",
-      "size": 13404,
+      "sha256": "9808a651c4a35f1b9f7e166ee2d1bb83611e70f982c096ca5a2f7a5a60be68cf",
+      "size": 13532,
       "protected": false
     },
     {
@@ -163,14 +199,14 @@
     },
     {
       "path": "src/ourob/planner/base.py",
-      "sha256": "e9a1f13643a3d71cf0aec6c720be2eaa6ed49f3c7825cd2632e9154240a3cebd",
-      "size": 3071,
+      "sha256": "1e6526a7cca272e1818d36244b880e46b5e1764ef58f113205c42868c0bdbfcb",
+      "size": 3078,
       "protected": false
     },
     {
       "path": "src/ourob/planner/llm.py",
-      "sha256": "62f600cc78a0445d9041da8dd7d4418e0bbf5269f8dace25b2ee33c4e7300d8e",
-      "size": 7818,
+      "sha256": "afa940674002e9331c76080ec12101c4699abac49d9d22f25877af5cf67f428f",
+      "size": 8478,
       "protected": false
     },
     {
@@ -187,14 +223,14 @@
     },
     {
       "path": "src/ourob/policies/base.py",
-      "sha256": "00fc94c17dfa178a9f6e50246d70e617eaba2011531aa8cde88dae7ba9877353",
-      "size": 7007,
+      "sha256": "977f3f81b7f8be2db06c0702ef9d2cd59ce343747d4b6f1f7b5027b14c862d2e",
+      "size": 6902,
       "protected": true
     },
     {
       "path": "src/ourob/policies/rules.py",
-      "sha256": "ff51eca1a5256e2c4dc87e09b11d07674ddd5de4203e3b850bb1f8bd2520f494",
-      "size": 8532,
+      "sha256": "d24ac572e5f14b1fdf244bedc6c6b581698eb6860860293fa8ec3ac33f2f8812",
+      "size": 12617,
       "protected": true
     },
     {
@@ -229,14 +265,14 @@
     },
     {
       "path": "src/ourob/skills/builtin/shell.py",
-      "sha256": "1373348b5e7b7bf507ae51d49d1b7dd3ca652fa8a9d7d1b462ff6da72a1fa538",
-      "size": 8549,
+      "sha256": "c79186959ad04f6ed8d9bdc964081355977e5c0ccead4f7f689a9ebb3948dc86",
+      "size": 8649,
       "protected": false
     },
     {
       "path": "src/ourob/skills/builtin/verification.py",
-      "sha256": "a4d33695f05a27eaf680a8353ba67a68f66a6a0f8bc4de80dbd5ef8fc6f4ca3e",
-      "size": 8018,
+      "sha256": "a2e828c4b5285b3a7b84a41fb8b7aa9207c94087e7c386285a8f7e9b99c10088",
+      "size": 8493,
       "protected": false
     },
     {
@@ -247,8 +283,8 @@
     },
     {
       "path": "src/ourob/skills/registry.py",
-      "sha256": "5871722a4019f33ca21e2b28ff39e2494192674d7f98405fee9d86b29feb3711",
-      "size": 6217,
+      "sha256": "1fa605ec156ec7d51c6ec11f6ebfa0544cba93fb03d99ff5264457f29789a3cc",
+      "size": 9445,
       "protected": false
     },
     {
@@ -259,14 +295,14 @@
     },
     {
       "path": "src/ourob/state/model.py",
-      "sha256": "b4da102a0afba4e28bc6afb822a303a916844d2df1c643750beab16069a7ea6f",
-      "size": 9473,
+      "sha256": "34086f7ab529a81895e0584e7e3699d77a15f268fb43f1278faedf35551f3f22",
+      "size": 9816,
       "protected": false
     },
     {
       "path": "src/ourob/state/store.py",
-      "sha256": "68816bd8d4cd6d527a9d68cb1522768dad59846dc20c8c584321e94ab3ec85a4",
-      "size": 13451,
+      "sha256": "d554dbdde2bc47eb8d5156b0ce9b8be99242ebae71da47aa08b6f8f2cf1e318e",
+      "size": 28716,
       "protected": false
     },
     {
@@ -277,32 +313,44 @@
     },
     {
       "path": "src/ourob/verify/gates.py",
-      "sha256": "7b24e30850983f848b3265ac63cdf0ad3cfbb80cbc51999c6bb97882edffc246",
-      "size": 17805,
+      "sha256": "b10cbbfa9ed6e4fbfc39ba16ad9920aa4c657363f6fad96177071ea53ac94eef",
+      "size": 17938,
       "protected": true
     },
     {
       "path": "src/ourob/verify/suite.py",
-      "sha256": "c40b288b2f03c9acb1ce8d59938f73976ba2d2d5871af68fe8dbc9abccb8c5ea",
-      "size": 5683,
+      "sha256": "19d7c0d41c7f949560bdeab655ea8d17b57d70438bd362f4d8c0b386f6a49969",
+      "size": 4399,
       "protected": true
     },
     {
+      "path": "tests/amendment_helpers.py",
+      "sha256": "f8e102bbf8926fded35a4743e6eb9106aa7b8e2bccc93586463348a6e92abef4",
+      "size": 778,
+      "protected": false
+    },
+    {
       "path": "tests/conftest.py",
-      "sha256": "282679baaa0124943144e587b5ed697918925e5d2fe36991cf2db2da2b9b03b4",
-      "size": 2168,
+      "sha256": "c464ccfb147f3ec26d762ba2c328aa443e5320286d9ade7747dc352eef2bb441",
+      "size": 2242,
       "protected": false
     },
     {
       "path": "tests/test_bootstrap.py",
-      "sha256": "3d36e52dadcdfc7ea82898840a3cce699eee2968ee161a9c9818a4e219326998",
-      "size": 17275,
+      "sha256": "c1eb1fcd1f78cffc0fc4b5cbf86dfffa4148b7303c806cf269b6a8adb69e6b21",
+      "size": 26903,
+      "protected": false
+    },
+    {
+      "path": "tests/test_child_boundary.py",
+      "sha256": "64b27b63321e531cc0f9ef20c13ff991c254a39a30d566db5a95b8e0d36cdb27",
+      "size": 16121,
       "protected": false
     },
     {
       "path": "tests/test_cli.py",
-      "sha256": "93e20b33b081bda88aa9a880739fada70a7584512e721ad9cd738f1a6172f1b1",
-      "size": 11138,
+      "sha256": "f0f6a59c5b372f4ec521156ac661d83d82ff558a1f6f33eaa6ba8c36e39ebb4f",
+      "size": 12883,
       "protected": false
     },
     {
@@ -319,14 +367,20 @@
     },
     {
       "path": "tests/test_fsx.py",
-      "sha256": "0c56cd7464086b018f2f3f78fa4912b5bab9499279ab3083000acef901032138",
-      "size": 4035,
+      "sha256": "e6c25db95ef6a2d735ebadefba83bb97e3499babce762b52db3cf0de70e255a4",
+      "size": 4521,
+      "protected": false
+    },
+    {
+      "path": "tests/test_journal_boundary.py",
+      "sha256": "72eb1b6c44f1f6da97585c6dbdb6e1a2e8c6a62a2c6951c1035070c927d53e44",
+      "size": 10432,
       "protected": false
     },
     {
       "path": "tests/test_kernel.py",
-      "sha256": "2389e12b77c0942e16f8cbc610ad88891d1c3fe55363e3d808e02972dafc1908",
-      "size": 16796,
+      "sha256": "dc2bf05e0f33b599ccd937d6d6653082e0dbc4da584c839ee291dea5dbb11394",
+      "size": 32859,
       "protected": false
     },
     {
@@ -343,20 +397,20 @@
     },
     {
       "path": "tests/test_policies.py",
-      "sha256": "addc20ce87de89408157116ac4f3fdb93bfc0867314a13662b5c432fc425fee7",
-      "size": 11544,
+      "sha256": "f22636fce1b5db705a5fefa6bfdc124c85ba443b1ee5c5c2f58b3ffd2d12ba85",
+      "size": 12761,
       "protected": false
     },
     {
       "path": "tests/test_resource_limits.py",
-      "sha256": "e7b4aeda469cce191a61fefae4c0feea225dfe0b8db797af78e385231167d245",
-      "size": 8018,
+      "sha256": "ea4ce04d838506bd618fbb9e0236a5e66fcd7e01b9ecb8514841261bf3e642a5",
+      "size": 8040,
       "protected": false
     },
     {
       "path": "tests/test_review.py",
-      "sha256": "de949443e6cde16ec0838127d836892ce005a2aeab145614e28dafc22157ef93",
-      "size": 9269,
+      "sha256": "593e1b69e03f2a86139631b505cfba9975f770484a0e3ca783083de963b81eaf",
+      "size": 9397,
       "protected": false
     },
     {
@@ -373,20 +427,20 @@
     },
     {
       "path": "tests/test_skills.py",
-      "sha256": "1c89b5d115ebab20ae976ab6f19460c9994508abae583033d5ad8fc594cf7791",
-      "size": 15800,
+      "sha256": "12b2c85ed08409d71b999315f883ec55456cda8208f70fd2a4efa8ca7fb32799",
+      "size": 17690,
       "protected": false
     },
     {
       "path": "tests/test_state.py",
-      "sha256": "dfe4cfe7bcad5fef42f2579f6b47e066dbbf3f49a9051c93d0af3ecfe8dc61e8",
-      "size": 6278,
+      "sha256": "14f27ae089f94e15cec801513e68536d36b4ba6cbe3fdd2cacbfe001b643617c",
+      "size": 11145,
       "protected": false
     },
     {
       "path": "tests/test_verify.py",
-      "sha256": "f60c68716624a6bfe7e566e879501dc3f4a0ed81e5e92b7456a7d1e25b637a03",
-      "size": 16182,
+      "sha256": "f0c90bfef85ec8ecb27361137f8f234d2b5ad7b30de2505b42b2f2808a1e9ecb",
+      "size": 16397,
       "protected": false
     }
   ]

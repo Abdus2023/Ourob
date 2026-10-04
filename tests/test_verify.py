@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from amendment_helpers import operator_authorize
 from ourob.config import DEFAULT_PROTECTED, Config
 from ourob.errors import ConfigError
 from ourob.state.model import VerificationReport
@@ -28,15 +29,7 @@ from ourob.verify.suite import VerificationSuite, format_report, verify_repo
 
 
 def gate_ctx(repo: Path, **extra) -> GateContext:
-    """Build a gate context; ``amended_paths`` becomes a real amendment object."""
-    from ourob.bootstrap.amend import Amendment
-
     config = Config.load(repo)
-    paths = extra.pop("amended_paths", None)
-    if paths:
-        extra["amendments"] = [
-            Amendment(amendment_id="amd-test", paths=list(paths), rationale="test authorisation")
-        ]
     return GateContext(
         repo=repo,
         config=config,
@@ -44,6 +37,16 @@ def gate_ctx(repo: Path, **extra) -> GateContext:
         extra=extra,
         state=StateStore(repo),
     )
+
+
+def authorize_paths(repo: Path, paths: list[str]) -> str:
+    """Create a real separately recorded test grant; never inject policy objects."""
+    from ourob.bootstrap.amend import AmendmentLedger
+
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    proposal = ledger.propose(paths, "verification-gate test", proposed_by="test")
+    operator_authorize(ledger, proposal.amendment_id, authorized_by="operator-test")
+    return proposal.amendment_id
 
 
 def test_every_gate_declares_metadata() -> None:
@@ -275,23 +278,26 @@ def test_manifest_gate_fails_on_unamended_protected_drift(repo: Path) -> None:
     assert "src/ourob/policies/rules.py" in result.summary
 
 
-def test_manifest_gate_accepts_amended_protected_drift(repo: Path) -> None:
+def test_manifest_gate_requires_a_real_separate_grant(repo: Path) -> None:
+    authorize_paths(repo, ["src/ourob/policies/rules.py"])
     (repo / "src" / "ourob" / "policies" / "rules.py").write_text("# amended\n", encoding="utf-8")
-    result = ManifestGate().run(gate_ctx(repo, amended_paths=["src/ourob/policies/rules.py"]))
+    result = ManifestGate().run(gate_ctx(repo))
     assert result.passed, result.summary
 
 
-def test_manifest_gate_honours_a_directory_pattern_amendment(repo: Path) -> None:
-    """An amendment for a protected directory covers the files under it."""
+def test_manifest_gate_honours_a_directory_grant(repo: Path) -> None:
+    """An operator grant for a protected directory covers files underneath it."""
+    authorize_paths(repo, ["src/ourob/policies/"])
     (repo / "src" / "ourob" / "policies" / "rules.py").write_text("# amended\n", encoding="utf-8")
-    result = ManifestGate().run(gate_ctx(repo, amended_paths=["src/ourob/policies/"]))
+    result = ManifestGate().run(gate_ctx(repo))
     assert result.passed, result.summary
-    assert "amendments considered" in result.details
+    assert "valid operator grants considered" in result.details
 
 
-def test_manifest_gate_rejects_an_amendment_for_a_different_path(repo: Path) -> None:
+def test_manifest_gate_rejects_a_grant_for_a_different_path(repo: Path) -> None:
+    authorize_paths(repo, ["ourob.toml"])
     (repo / "src" / "ourob" / "policies" / "rules.py").write_text("# amended\n", encoding="utf-8")
-    result = ManifestGate().run(gate_ctx(repo, amended_paths=["ourob.toml"]))
+    result = ManifestGate().run(gate_ctx(repo))
     assert not result.passed
     assert "src/ourob/policies/rules.py" in result.summary
 

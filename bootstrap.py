@@ -43,6 +43,7 @@ EXCLUDES = {
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",
+    "coverage",
     "node_modules",
     "dist",
     "build",
@@ -68,7 +69,12 @@ def walk() -> list[str]:
     for dirpath, dirnames, filenames in os.walk(REPO):
         dirnames[:] = sorted(d for d in dirnames if d not in EXCLUDES and not d.endswith(".egg-info"))
         for name in sorted(filenames):
-            if name.endswith((".pyc", ".pyo")) or name.endswith("~"):
+            if (
+                name.endswith((".pyc", ".pyo"))
+                or name.endswith("~")
+                or name == ".coverage"
+                or name.startswith(".coverage.")
+            ):
                 continue
             full = Path(dirpath) / name
             rel = full.relative_to(REPO).as_posix()

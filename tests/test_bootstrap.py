@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from amendment_helpers import operator_authorize
 from ourob.bootstrap.amend import Amendment, AmendmentLedger, AmendmentStatus
 from ourob.bootstrap.coldstart import boot, locate_source_root
 from ourob.bootstrap.manifest import Manifest, compare
@@ -97,6 +99,23 @@ def test_the_root_bootstrap_script_runs_standalone(repo: Path) -> None:
     )
     assert proc.returncode == 0, proc.stderr
     assert "verdict      TRUSTED" in proc.stdout
+
+
+def test_the_root_bootstrap_script_ignores_generated_coverage_data(repo: Path) -> None:
+    (repo / ".coverage").write_text("generated", encoding="utf-8")
+    (repo / ".coverage.worker").write_text("generated", encoding="utf-8")
+    (repo / "coverage").mkdir()
+    (repo / "coverage" / "index.html").write_text("generated", encoding="utf-8")
+    proc = subprocess.run(
+        [sys.executable, "bootstrap.py", "--prove", "--strict"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "verdict      TRUSTED" in proc.stdout
+    assert ".coverage" not in proc.stdout
 
 
 def test_the_root_bootstrap_script_refuses_protected_drift(repo: Path) -> None:
@@ -257,18 +276,38 @@ def test_amendment_lifecycle(repo: Path) -> None:
     assert amendment.status == AmendmentStatus.PROPOSED
     assert amendment.covers("src/ourob/policies/rules.py")
     assert not amendment.covers("src/ourob/kernel.py")
-    assert ledger.authorising("src/ourob/policies/rules.py").amendment_id == amendment.amendment_id
+    assert ledger.authorising("src/ourob/policies/rules.py") is None
+    assert ledger.authorising_id(amendment.amendment_id) is None
 
-    ratified = ledger.set_status(
-        amendment.amendment_id, AmendmentStatus.RATIFIED, evidence={"digest": "abc"}
-    )
+    operator_authorize(ledger, amendment.amendment_id, authorized_by="operator-test")
+    authorized = ledger.authorising("src/ourob/policies/rules.py")
+    assert authorized is not None
+    assert authorized.amendment_id == amendment.amendment_id
+    assert authorized.status == AmendmentStatus.AUTHORIZED
+
+    ratified = ledger.set_status(amendment.amendment_id, AmendmentStatus.RATIFIED, evidence={"digest": "abc"})
     assert ratified.ratified_at
     assert ratified.evidence == {"digest": "abc"}
-    assert ledger.authorising("src/ourob/policies/rules.py") is not None
+    assert ledger.authorising("src/ourob/policies/rules.py") is None
     assert ledger.load(amendment.amendment_id).status == AmendmentStatus.RATIFIED
 
-    ledger.set_status(amendment.amendment_id, AmendmentStatus.REJECTED)
-    assert ledger.authorising("src/ourob/policies/rules.py") is None
+
+def test_amendment_cannot_name_an_unprotected_path(repo: Path) -> None:
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    with pytest.raises(BootstrapError, match="only currently protected paths"):
+        ledger.propose(["docs/ARCHITECTURE.md"], "attempt to overreach authorization scope")
+
+
+def test_amendment_authorization_requires_matching_confirmation(repo: Path) -> None:
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    amendment = ledger.propose(["ourob.toml"], "change the budget")
+    with pytest.raises(BootstrapError, match="confirmation did not match"):
+        ledger.authorize(
+            amendment.amendment_id,
+            confirmation="different-proposal",
+            authorized_by="operator-test",
+        )
+    assert ledger.authorising_id(amendment.amendment_id) is None
 
 
 def test_amendment_requires_a_rationale(repo: Path) -> None:
@@ -296,6 +335,152 @@ def test_amendment_survives_a_round_trip(repo: Path) -> None:
     assert again.amendment_id == amendment.amendment_id
     assert again.paths == amendment.paths
     assert again.rationale == amendment.rationale
+
+
+def test_proposal_file_cannot_claim_authorized_status(repo: Path) -> None:
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    amendment = ledger.propose(["ourob.toml"], "change the budget")
+    path = ledger._path(amendment.amendment_id)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["status"] = "authorized"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(BootstrapError, match="invalid stored amendment status"):
+        ledger.load(amendment.amendment_id)
+    assert ledger.authorising_id(amendment.amendment_id) is None
+
+
+@pytest.mark.parametrize(
+    ("field", "stale_value", "message"),
+    [
+        ("base_revision", "stale-revision", "base revision"),
+        ("base_digest", "f" * 64, "base lock digest"),
+    ],
+)
+def test_stale_proposal_cannot_be_authorized(repo: Path, field: str, stale_value: str, message: str) -> None:
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    amendment = ledger.propose(["ourob.toml"], "change the budget")
+    setattr(amendment, field, stale_value)
+    ledger.save(amendment)
+    with pytest.raises(BootstrapError, match=message):
+        operator_authorize(ledger, amendment.amendment_id, authorized_by="operator-test")
+    assert ledger.authorising_id(amendment.amendment_id) is None
+
+
+def test_proposal_changed_after_display_cannot_be_authorized(repo: Path) -> None:
+    from ourob.bootstrap.amend import _confirmed_operator_action
+    from ourob.fsx import sha256_file
+
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    amendment = ledger.propose(["ourob.toml"], "change the budget")
+    proposal_sha256 = sha256_file(ledger._path(amendment.amendment_id))
+    with _confirmed_operator_action(amendment.amendment_id, amendment.amendment_id, proposal_sha256):
+        amendment.rationale = "changed after operator display"
+        ledger.save(amendment)
+        with pytest.raises(BootstrapError, match="exact proposal revision and digest"):
+            ledger.authorize(
+                amendment.amendment_id,
+                confirmation=amendment.amendment_id,
+                authorized_by="operator-test",
+            )
+    assert ledger.authorising_id(amendment.amendment_id) is None
+
+
+def test_modified_proposal_invalidates_its_prior_grant(repo: Path) -> None:
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    amendment = ledger.propose(["ourob.toml"], "change the budget")
+    operator_authorize(ledger, amendment.amendment_id, authorized_by="operator-test")
+    path = ledger._path(amendment.amendment_id)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["paths"] = ["src/ourob/policies/"]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert ledger.authorising_id(amendment.amendment_id) is None
+
+
+def test_proposal_cannot_retroactively_authorize_existing_drift(repo: Path) -> None:
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    amendment = ledger.propose(["src/ourob/policies/rules.py"], "change a rule")
+    target = repo / "src" / "ourob" / "policies" / "rules.py"
+    target.write_text(target.read_text(encoding="utf-8") + "\n# changed before grant\n", encoding="utf-8")
+    with pytest.raises(BootstrapError, match="cannot retroactively authorize"):
+        operator_authorize(ledger, amendment.amendment_id, authorized_by="operator-test")
+
+
+@pytest.mark.parametrize(
+    ("field", "wrong_value"),
+    [
+        ("base_revision", "stale-revision"),
+        ("base_digest", "f" * 64),
+        ("paths", ["src/ourob/policies/"]),
+    ],
+)
+def test_wrong_pin_or_path_in_forged_grant_does_not_authorize(
+    repo: Path, field: str, wrong_value: str | list[str]
+) -> None:
+    from ourob.bootstrap.amend import _confirmed_operator_action
+    from ourob.errors import StateError
+    from ourob.fsx import sha256_file
+    from ourob.state.store import Journal, StateStore
+
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    amendment = ledger.propose(["ourob.toml"], "change the budget")
+    payload = {
+        "amendment_id": amendment.amendment_id,
+        "authorization_id": "auth-forged",
+        "authorized_by": "operator-test",
+        "proposal_sha256": sha256_file(ledger._path(amendment.amendment_id)),
+        "paths": amendment.paths,
+        "base_revision": amendment.base_revision,
+        "base_digest": amendment.base_digest,
+    }
+    payload[field] = wrong_value
+    state = StateStore(repo)
+    with pytest.raises(StateError, match="interactive operator confirmation"):
+        state.record_system("amendment.authorized", payload)
+    assert not (state.root / "system.jsonl").exists()
+
+    # Even a correctly hash-chained raw event with a wrong pinned revision or
+    # digest is not resolved as authority for the current proposal.
+    with _confirmed_operator_action(
+        amendment.amendment_id, amendment.amendment_id, payload["proposal_sha256"]
+    ):
+        Journal(state.root / "system.jsonl").append("amendment.authorized", payload)
+    assert ledger.authorising_id(amendment.amendment_id) is None
+    # The event is syntactically valid and hash-chained, but the mismatched pin
+    # does not authorize the current proposal.
+    assert all(item["ok"] for item in state.check_chain())
+
+
+def test_duplicate_authorization_append_is_rejected_before_history_changes(repo: Path) -> None:
+    from ourob.bootstrap.amend import _confirmed_operator_action
+    from ourob.errors import StateError
+    from ourob.state.store import Journal, StateStore
+
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    amendment = ledger.propose(["ourob.toml"], "change the budget")
+    operator_authorize(ledger, amendment.amendment_id, authorized_by="operator-test")
+    state = StateStore(repo)
+    grant = next(event for event in state.system_events() if event["kind"] == "amendment.authorized")
+    with (
+        _confirmed_operator_action(
+            amendment.amendment_id, amendment.amendment_id, grant["payload"]["proposal_sha256"]
+        ),
+        pytest.raises(StateError, match="duplicated or replayed"),
+    ):
+        Journal(state.root / "system.jsonl").append("amendment.authorized", grant["payload"])
+    assert len([event for event in state.system_events() if event["kind"] == "amendment.authorized"]) == 1
+    assert ledger.authorising_id(amendment.amendment_id) is not None
+    assert all(item["ok"] for item in state.check_chain())
+
+
+def test_terminal_amendment_event_prevents_grant_replay(repo: Path) -> None:
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    amendment = ledger.propose(["ourob.toml"], "change the budget")
+    original = ledger._path(amendment.amendment_id).read_bytes()
+    operator_authorize(ledger, amendment.amendment_id, authorized_by="operator-test")
+    ledger.set_status(amendment.amendment_id, AmendmentStatus.REJECTED)
+    # Simulate restoring an old proposal snapshot after it was consumed.
+    ledger._path(amendment.amendment_id).write_bytes(original)
+    assert ledger.authorising_id(amendment.amendment_id) is None
 
 
 def test_an_amendment_for_one_path_authorises_nothing_else(repo: Path) -> None:
@@ -345,9 +530,9 @@ def test_promote_rolls_back_when_verification_fails(repo: Path) -> None:
     (repo / "tests" / "test_broken_change.py").write_text(FAILING_TEST, encoding="utf-8")
     snapshot = Snapshot.capture(repo, "run-fail")
 
-    result = Promotion(
-        repo, use_git=False, rollback_on_failure=True, snapshot_run_id="run-fail"
-    ).promote(message="a change that breaks the build", gates=["compile", "tests"])
+    result = Promotion(repo, use_git=False, rollback_on_failure=True, snapshot_run_id="run-fail").promote(
+        message="a change that breaks the build", gates=["compile", "tests"]
+    )
     assert not result.accepted
     assert any("verification failed" in m for m in result.messages)
     assert "tests/test_broken_change.py" in result.rollback["removed"]
@@ -359,9 +544,7 @@ def test_promote_rolls_back_when_verification_fails(repo: Path) -> None:
 
 def test_promote_can_be_told_to_keep_a_failing_tree(repo: Path) -> None:
     (repo / "tests" / "test_broken_change.py").write_text(FAILING_TEST, encoding="utf-8")
-    result = Promotion(repo, use_git=False, rollback_on_failure=False).promote(
-        gates=["compile", "tests"]
-    )
+    result = Promotion(repo, use_git=False, rollback_on_failure=False).promote(gates=["compile", "tests"])
     assert not result.accepted
     assert (repo / "tests" / "test_broken_change.py").exists()
 
@@ -369,6 +552,7 @@ def test_promote_can_be_told_to_keep_a_failing_tree(repo: Path) -> None:
 def test_promote_with_an_amendment_ratifies_it(repo: Path) -> None:
     ledger = AmendmentLedger(repo / ".ourob" / "amendments")
     amendment = ledger.propose(["src/ourob/policies/"], "lower the retry threshold")
+    operator_authorize(ledger, amendment.amendment_id, authorized_by="operator-test")
     target = repo / "src" / "ourob" / "policies" / "rules.py"
     target.write_text(
         target.read_text(encoding="utf-8").replace("MAX_REPEATS = 3", "MAX_REPEATS = 2"),
@@ -388,11 +572,10 @@ def test_promote_with_an_amendment_ratifies_it(repo: Path) -> None:
 def test_promote_rejects_an_amendment_that_does_not_cover_the_change(repo: Path) -> None:
     ledger = AmendmentLedger(repo / ".ourob" / "amendments")
     amendment = ledger.propose(["ourob.toml"], "only the config")
+    operator_authorize(ledger, amendment.amendment_id, authorized_by="operator-test")
     (repo / "src" / "ourob" / "policies" / "rules.py").write_text("# tampered\n", encoding="utf-8")
 
-    result = Promotion(repo, use_git=False).promote(
-        amendment_id=amendment.amendment_id, gates=["compile"]
-    )
+    result = Promotion(repo, use_git=False).promote(amendment_id=amendment.amendment_id, gates=["compile"])
     assert not result.accepted
     assert any("does not authorise" in m for m in result.messages)
 
@@ -407,6 +590,7 @@ def test_promote_rejects_an_unknown_amendment(repo: Path) -> None:
 def test_a_failed_promotion_marks_the_amendment_rejected(repo: Path) -> None:
     ledger = AmendmentLedger(repo / ".ourob" / "amendments")
     amendment = ledger.propose(["src/ourob/verify/"], "break a gate on purpose")
+    operator_authorize(ledger, amendment.amendment_id, authorized_by="operator-test")
     (repo / "src" / "ourob" / "verify" / "gates.py").write_text("this is not python(\n", encoding="utf-8")
 
     result = Promotion(repo, use_git=False, rollback_on_failure=False).promote(
@@ -434,11 +618,22 @@ def test_promote_commits_when_git_is_available(repo: Path) -> None:
         cwd=repo,
         check=True,
     )
-    (repo / "docs" / "NOTES.md").write_text("# notes\n", encoding="utf-8")
-    result = Promotion(repo).promote(message="notes under git", gates=["compile"])
-    assert result.accepted
-    assert result.git_sha
-    status = subprocess.run(
-        ["git", "status", "--porcelain"], cwd=repo, capture_output=True, text=True
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    amendment = ledger.propose(["src/ourob/policies/"], "tighten the retry threshold")
+    operator_authorize(ledger, amendment.amendment_id, authorized_by="operator-test")
+    target = repo / "src" / "ourob" / "policies" / "rules.py"
+    target.write_text(
+        target.read_text(encoding="utf-8").replace("MAX_REPEATS = 3", "MAX_REPEATS = 2"),
+        encoding="utf-8",
     )
+    result = Promotion(repo).promote(
+        amendment_id=amendment.amendment_id,
+        message="tighten retry threshold under git",
+        gates=["compile", "policy-integrity"],
+    )
+    assert result.accepted, result.describe()
+    assert result.git_sha
+    assert ledger.load(amendment.amendment_id).status == AmendmentStatus.RATIFIED
+    assert ledger.authorising_id(amendment.amendment_id) is None
+    status = subprocess.run(["git", "status", "--porcelain"], cwd=repo, capture_output=True, text=True)
     assert status.stdout.strip() == ""

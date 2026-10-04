@@ -66,6 +66,12 @@ def test_atomic_write_overwrites_in_place(tmp_path: Path) -> None:
     assert target.read_text(encoding="utf-8") == "two"
 
 
+def test_atomic_write_honours_the_requested_mode(tmp_path: Path) -> None:
+    target = tmp_path / "private.txt"
+    fsx.atomic_write(target, "private", mode=0o600)
+    assert target.stat().st_mode & 0o777 == 0o600
+
+
 def test_walk_repo_skips_generated_directories(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "real.py").write_text("", encoding="utf-8")
@@ -73,6 +79,10 @@ def test_walk_repo_skips_generated_directories(tmp_path: Path) -> None:
     (tmp_path / "__pycache__" / "junk.pyc").write_text("", encoding="utf-8")
     (tmp_path / ".git").mkdir()
     (tmp_path / ".git" / "HEAD").write_text("", encoding="utf-8")
+    (tmp_path / ".coverage").write_text("generated", encoding="utf-8")
+    (tmp_path / ".coverage.worker").write_text("generated", encoding="utf-8")
+    (tmp_path / "coverage").mkdir()
+    (tmp_path / "coverage" / "index.html").write_text("generated", encoding="utf-8")
     names = {fsx.rel(p, tmp_path) for p in fsx.walk_repo(tmp_path)}
     assert names == {"src/real.py"}
 

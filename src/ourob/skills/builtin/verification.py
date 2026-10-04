@@ -30,7 +30,7 @@ from ..base import Skill, SkillContext, skill
             "default": [],
             "desc": "subset of gate names to run; empty means the configured suite",
         },
-        "save": {"type": "bool", "default": True},
+        "save": {"type": "bool", "default": False},
     },
 )
 class RunVerification(Skill):
@@ -38,16 +38,19 @@ class RunVerification(Skill):
         from ...verify.suite import VerificationSuite, format_report
 
         names = [str(g) for g in (kwargs.get("gates") or [])] or None
-        amended = [str(p) for p in (ctx.services.get("amended_paths") or [])]
         suite = VerificationSuite(
             ctx.repo,
             ctx.services.get("config"),
             gates=names,
             state=ctx.store,
             run_id=ctx.run_id,
-            amended_paths=amended,
         )
-        report = suite.run(save=bool(kwargs.get("save", True)))
+        if bool(kwargs.get("save", False)):
+            raise SkillError(
+                "a runtime skill cannot write verification reports into protected state; "
+                "use `ourob verify` or rely on the kernel's final verification report"
+            )
+        report = suite.run(save=False)
         text = format_report(report, verbose=True)
         return SkillResult(
             ok=report.passed,
@@ -74,9 +77,7 @@ class RunTests(Skill):
         from ...verify.gates import TestGate
         from ...verify.suite import VerificationSuite
 
-        suite = VerificationSuite(
-            ctx.repo, ctx.services.get("config"), state=ctx.store, run_id=ctx.run_id
-        )
+        suite = VerificationSuite(ctx.repo, ctx.services.get("config"), state=ctx.store, run_id=ctx.run_id)
         gate_ctx = suite.context()
         gate_ctx.timeout = int(kwargs.get("timeout", 600))
         result = TestGate().run(gate_ctx)
@@ -104,13 +105,25 @@ class ListSkills(Skill):
             for c in catalogue
         ]
         problems = registry.problems()
+        discovery = registry.discovery_status()
+        if discovery["restart_required"]:
+            pending = [path for paths in discovery["pending"].values() for path in paths]
+            lines.append(
+                "\ndiscovery snapshot is stale; verify/promote and start a fresh runtime "
+                f"before using pending files: {', '.join(pending)}"
+            )
         if problems:
             lines.append("\ndiscovery problems:")
             lines.extend(f"  - {p}" for p in problems)
         return SkillResult(
             ok=True,
             output="\n".join(lines) or "(no skills)",
-            data={"skills": catalogue, "count": len(catalogue), "problems": problems},
+            data={
+                "skills": catalogue,
+                "count": len(catalogue),
+                "problems": problems,
+                "discovery": discovery,
+            },
         )
 
 
@@ -163,8 +176,7 @@ class ReadManifest(Skill):
         return SkillResult(
             ok=True,
             output=(
-                f"lock {manifest.digest[:16]} | {len(manifest)} files | "
-                f"drift: {diff.describe()}\n{payload}"
+                f"lock {manifest.digest[:16]} | {len(manifest)} files | drift: {diff.describe()}\n{payload}"
             ),
             data=data,
         )
@@ -174,8 +186,9 @@ class ReadManifest(Skill):
     "propose_amendment",
     title="Propose a constitutional amendment",
     description=(
-        "Open an amendment authorising writes to protected paths. Protected paths "
-        "cannot be modified without one; ratification still requires green gates."
+        "Create a proposal describing a possible protected-path change. A proposal "
+        "does not authorize writes; only a separate operator grant recorded by "
+        "the standalone authorize command can do that."
     ),
     params={
         "paths": {"type": "list", "required": True, "desc": "protected paths to authorise"},
@@ -192,9 +205,6 @@ class ProposeAmendment(Skill):
         amendment = ledger.propose(paths, str(kwargs["rationale"]), proposed_by="runtime")
         if ctx.store is not None:
             ctx.store.record(ctx.run_id, "amendment.proposed", amendment.to_dict())
-        ctx.services["amended_paths"] = sorted(
-            set(ctx.services.get("amended_paths") or []) | set(amendment.paths)
-        )
         return SkillResult(
             ok=True,
             output=amendment.summary(),
@@ -207,8 +217,7 @@ class ProposeAmendment(Skill):
     "finish",
     title="Finish the run",
     description=(
-        "Declare the run complete with an outcome and a summary. Calling this ends "
-        "the planning loop."
+        "Declare the run complete with an outcome and a summary. Calling this ends the planning loop."
     ),
     params={
         "summary": {"type": "str", "required": True},

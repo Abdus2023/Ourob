@@ -14,9 +14,10 @@ import sys
 import time
 from pathlib import Path
 
+from ourob.child_sandbox import _kill_group
 from ourob.config import Config, ResourceLimits
 from ourob.skills.base import SkillContext
-from ourob.skills.builtin.shell import RunCommand, RunPython, _kill_group, _limit_preexec
+from ourob.skills.builtin.shell import RunCommand, RunPython, _limit_preexec
 
 
 def ctx_with(repo: Path, **limits: int) -> SkillContext:
@@ -207,8 +208,7 @@ def test_limits_are_read_from_the_config(repo: Path) -> None:
 
 def test_unknown_limit_keys_are_ignored(repo: Path) -> None:
     (repo / "ourob.toml").write_text(
-        (repo / "ourob.toml").read_text(encoding="utf-8")
-        + "\n[policy.limits]\nbogus_key = 1\n",
+        (repo / "ourob.toml").read_text(encoding="utf-8") + "\n[policy.limits]\nbogus_key = 1\n",
         encoding="utf-8",
     )
     assert Config.load(repo).policy.limits == ResourceLimits()
@@ -228,4 +228,3 @@ def test_run_command_is_limited_too(repo: Path) -> None:
     assert result.ok, result.output
     ceiling = 64 * 1024 * 1024
     assert str((ceiling, ceiling)) in result.output
-

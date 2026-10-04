@@ -31,14 +31,17 @@ python bootstrap.py selftest
 python bootstrap.py verify -v
 ```
 
-For development and testing, install the optional toolchain:
+For development and testing, install the complete documented toolchain:
 
 ```bash
 python -m pip install -e '.[dev]'
 python -m pytest
 ```
 
-The optional LLM planner requires `httpx`:
+The `dev` extra includes `httpx` because the LLM-planner test module imports it
+while pytest collects the suite. `httpx` remains optional for a normal runtime
+installation; the LLM planner requires it when enabled. Install only that
+runtime feature with:
 
 ```bash
 python -m pip install -e '.[llm]'
@@ -182,12 +185,20 @@ contracts are rejected by discovery and the `skill-contract` gate.
 The shell and Python execution skills are intentionally constrained. Child
 processes run in their own process group and receive resource ceilings before
 `exec`, including address-space and file-size limits, optional CPU and process
-limits, and disabled core dumps. A timeout can therefore terminate the complete
-child process group rather than only its direct child.
+limits, and disabled core dumps. On supported Linux hosts, a Landlock ruleset
+also denies child and descendant content/namespace writes to configured
+protected paths, `.ourob`, and `.git`; a seccomp filter denies selected ownership
+and extended-attribute changes. It does not mediate `chmod` or timestamp
+changes. Children may create or modify file contents and namespace entries
+only in existing unprotected repository directories and a per-call temporary
+directory.
+Unsupported hosts fail closed for child execution.
 
-These controls are not a security sandbox. Child processes run with the
-runtime's operating-system privileges; stronger isolation would require OS-level
-facilities such as namespaces, seccomp, or containers.
+This is a **narrow child-process write boundary**, not a general OS sandbox. It
+does not restrict reads, networking, or general process inspection; it does not
+confine file-mode or timestamp changes; and it does not stop a user with checkout
+access or arbitrary in-process Python code from writing files directly. No
+namespace, container, or privilege-separation claim is made.
 
 ### Policies
 
@@ -198,11 +209,12 @@ set protects the following boundaries:
 | Policy area | Purpose |
 | --- | --- |
 | Path confinement | Keep declared path parameters inside the repository. |
-| Protected paths | Require an amendment before changing guardrails or bootstrap files. |
-| Journal integrity | Prevent a run from rewriting its own history. |
+| Protected paths | Require a separately authorized, exact-scope amendment before changing guardrails or bootstrap files. |
+| Journal integrity | Deny ordinary runtime writes to history and verify hash chains, anchors, and system-event semantics. |
 | Budget | Bound steps and execution resources. |
 | Payload size | Reject unreasonably large writes. |
 | Command allowlist | Restrict commands to those configured in `ourob.toml`. |
+| Child filesystem | Require a supported write boundary before executing child code. |
 | Loop breaker | Prevent endless retries of the same failing operation. |
 
 Path-bearing skill parameters must explicitly declare `"path": true` in their
@@ -254,7 +266,7 @@ is not.
 ## Protected paths and amendments
 
 The following paths are protected by `ourob.toml` and cannot be modified by a
-skill without an active amendment:
+normal mutating skill without a separately recorded, currently valid operator grant:
 
 ```text
 ourob.toml
@@ -275,16 +287,27 @@ python bootstrap.py amend src/ourob/policies/ \
   --why "explain the constitutional change"
 ```
 
-After the run has produced a candidate tree, ratification verifies it and either
-promotes it or rolls it back exactly:
+A proposal alone grants no write authority. Before a protected change, an
+operator must separately authorize the exact displayed proposal in an interactive
+terminal; this pins the proposal digest, base revision, lock digest, and path set
+in `.ourob/system.jsonl`:
+
+```bash
+python bootstrap.py authorize <amendment-id> --by "operator identity"
+```
+
+The command requires typing the proposal ID. `--by` is a recorded, self-asserted
+label, not cryptographic identity proof. After the run has produced a candidate
+tree, ratification verifies it and either promotes it or rolls it back exactly:
 
 ```bash
 python bootstrap.py ratify <amendment-id> \
   --message "describe the accepted change"
 ```
 
-An amendment authorizes writes; it does not accept them. Only a green verification
-suite can ratify the resulting tree. See [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md)
+An operator grant permits only the proposal's exact paths while its pinned base
+remains current; it does not accept the change. Only a green verification suite
+can ratify the resulting tree. See [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md)
 for the full rules and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design
 rationale.
 
@@ -299,10 +322,10 @@ python bootstrap.py run plans/self_extend.json -v
 python bootstrap.py verify -v
 ```
 
-The self-extension example adds the `rot13` contribution skill. The refused plan
-attempts operations such as leaving the repository, changing protected machinery,
-rewriting the journal, and running a denied destructive command. Those calls are
-rejected before the skill executes.
+The self-extension example adds a new `text_metrics` contribution skill and its
+behavioral tests. The refused plan attempts operations such as leaving the
+repository, changing protected machinery, rewriting the journal, and running a
+denied destructive command. Those calls are rejected before the skill executes.
 
 A run that changes files is **drift** until it is promoted. Review the actual
 journal-derived change set before promotion:
@@ -345,15 +368,16 @@ artifacts, and `.ourob/` directories are ignored by Git.
 
 `ourob` deliberately does **not** claim to provide:
 
-- OS-level sandboxing or privilege separation for child processes;
-- concurrent runs against one kernel and journal;
-- semantic judgment about whether a change is wise or useful; or
-- protection from an operator who already has shell access to the checkout.
+- a general OS sandbox or privilege separation for child processes;
+- protection from arbitrary in-process Python or a user who can directly edit the checkout;
+- concurrent runs against one kernel and journal; or
+- semantic judgment about whether a change is wise or useful.
 
-The runtime provides procedural controls: explicit policies, tamper-evident
-history, reproducible plans, independent gates, exact rollback, and human-readable
-promotion records. Those controls make self-modification reviewable and fail
-closed; they do not replace human judgment or operating-system security.
+The runtime provides procedural controls: explicit application policies,
+hash-chained journals with head anchors, reproducible plans, independent gates,
+rollback, and human-readable promotion records. These controls are bounded by
+their application and child-process paths; they do not replace human judgment or
+operating-system security.
 
 ## License
 

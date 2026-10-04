@@ -19,6 +19,21 @@ from ourob.state.model import (
 from ourob.state.store import Journal, StateStore
 
 
+def test_state_store_rejects_a_symlinked_runtime_root(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    docs = repo / "docs"
+    docs.mkdir()
+    sentinel = docs / "keep.txt"
+    sentinel.write_text("untouched\n", encoding="utf-8")
+    (repo / ".ourob").symlink_to(docs, target_is_directory=True)
+
+    with pytest.raises(StateError, match="must not be a symlink"):
+        StateStore(repo)
+    assert sentinel.read_text(encoding="utf-8") == "untouched\n"
+    assert list(docs.iterdir()) == [sentinel]
+
+
 def test_journal_round_trips_events(tmp_path: Path) -> None:
     journal = Journal(tmp_path / "j.jsonl")
     journal.append("a", {"n": 1})
@@ -65,7 +80,59 @@ def test_tampering_is_detected(tmp_path: Path, tamper: str) -> None:
 
     ok, detail = Journal(path).check_chain()
     assert not ok
-    assert "mismatch" in detail or "does not match" in detail or "truncated" in detail
+    assert any(
+        marker in detail
+        for marker in ("mismatch", "does not match", "truncated", "sequence is not contiguous")
+    )
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        "delete",
+        "wrong-sequence",
+        "wrong-hash",
+        "malformed",
+        "string-sequence",
+        "boolean-sequence",
+        "extra-field",
+        "duplicate-key",
+    ],
+)
+def test_head_anchor_tampering_is_detected_and_blocks_append(tmp_path: Path, tamper: str) -> None:
+    path = tmp_path / "head.jsonl"
+    journal = Journal(path)
+    journal.append("tick", {"i": 1})
+    head = path.with_name(path.name + ".head")
+    if tamper == "delete":
+        head.unlink()
+    elif tamper == "malformed":
+        head.write_text("not json", encoding="utf-8")
+    elif tamper == "duplicate-key":
+        data = json.loads(head.read_text(encoding="utf-8"))
+        head.write_text(
+            f'{{"seq":{data["seq"]},"seq":{data["seq"]},"hash":"{data["hash"]}"}}',
+            encoding="utf-8",
+        )
+    else:
+        data = json.loads(head.read_text(encoding="utf-8"))
+        if tamper == "wrong-sequence":
+            data["seq"] = 0
+        elif tamper == "string-sequence":
+            data["seq"] = str(data["seq"])
+        elif tamper == "boolean-sequence":
+            data["seq"] = True
+        elif tamper == "wrong-hash":
+            data["hash"] = "f" * 64
+        elif tamper == "extra-field":
+            data["comment"] = "not part of the canonical anchor"
+        head.write_text(json.dumps(data), encoding="utf-8")
+
+    intact, detail = Journal(path).check_chain()
+    assert not intact
+    assert any(word in detail for word in ("anchor", "truncated", "unreadable"))
+    with pytest.raises(StateError, match="refusing to append to corrupt journal"):
+        Journal(path).append("later", {})
 
 
 def test_store_opens_and_closes_a_run(repo: Path, store: StateStore) -> None:
@@ -159,9 +226,64 @@ def test_run_id_cannot_escape_the_journal_directory(store: StateStore) -> None:
 
 
 def test_system_journal_is_separate_from_runs(repo: Path, store: StateStore) -> None:
-    store.record_system("promotion.accepted", {"x": 1})
+    store.record_system("promotion.rejected", {"accepted": False, "amendment_id": ""})
     kinds = [e["kind"] for e in store.system_events()]
-    assert kinds == ["promotion.accepted"]
+    assert kinds == ["promotion.rejected"]
+
+
+def test_semantically_forged_system_event_is_refused_and_detected(repo: Path) -> None:
+    store = StateStore(repo)
+    payload = {"accepted": True, "amendment_id": ""}
+    with pytest.raises(StateError, match="refusing to append invalid system event"):
+        store.record_system("promotion.rejected", payload)
+    assert not (store.root / "system.jsonl").exists()
+
+    # The low-level journal API must reject the same impossible transition
+    # before either the event or its head anchor is written.
+    with pytest.raises(StateError, match="inconsistent acceptance state"):
+        Journal(store.root / "system.jsonl").append("promotion.rejected", payload)
+    assert not (store.root / "system.jsonl").exists()
+    assert not (store.root / "system.jsonl.head").exists()
+    assert all(item["ok"] for item in store.check_chain())
+
+
+def test_authorization_events_require_confirmed_operator_scope(repo: Path) -> None:
+    store = StateStore(repo)
+    payload = {"amendment_id": "amd-forged"}
+    with pytest.raises(StateError, match="interactive operator confirmation"):
+        store.record_system("amendment.authorized", payload)
+    with pytest.raises(StateError, match="interactive operator confirmation"):
+        Journal(store.root / "system.jsonl").append("amendment.authorized", payload)
+    assert not (store.root / "system.jsonl").exists()
+    assert not (store.root / "system.jsonl.head").exists()
+    assert all(item["ok"] for item in store.check_chain())
+
+
+def test_runtime_actor_cannot_claim_operator_authorization_in_system_history(repo: Path) -> None:
+    from ourob.bootstrap.amend import _confirmed_operator_action
+
+    store = StateStore(repo)
+    payload = {
+        "amendment_id": "amd-forged",
+        "authorization_id": "auth-forged",
+        "authorized_by": "runtime",
+        "proposal_sha256": "a" * 64,
+        "paths": ["ourob.toml"],
+        "base_revision": "unversioned",
+        "base_digest": "b" * 64,
+    }
+    with pytest.raises(StateError, match="interactive operator confirmation"):
+        store.record_system("amendment.authorized", payload)
+    with (
+        _confirmed_operator_action(
+            payload["amendment_id"], payload["amendment_id"], payload["proposal_sha256"]
+        ),
+        pytest.raises(StateError, match="not an operator identity"),
+    ):
+        Journal(store.root / "system.jsonl").append("amendment.authorized", payload)
+    assert not (store.root / "system.jsonl").exists()
+    assert not (store.root / "system.jsonl.head").exists()
+    assert all(item["ok"] for item in store.check_chain())
 
 
 def test_all_journals_report_chain_status(repo: Path, store: StateStore) -> None:

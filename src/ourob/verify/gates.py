@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
 import sys
 import time
 from abc import ABC, abstractmethod
@@ -21,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..child_sandbox import run_child
 from ..config import Config
 from ..state.model import GateResult
 from ..state.store import StateStore
@@ -37,22 +37,21 @@ class GateContext:
     extra: dict[str, Any] = field(default_factory=dict)
 
     def subprocess(self, argv: list[str], *, timeout: int | None = None) -> tuple[int, str]:
-        try:
-            proc = subprocess.run(
-                argv,
-                cwd=self.repo,
-                capture_output=True,
-                text=True,
-                timeout=timeout or self.timeout,
-                env={"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(Path.home()),
-                     "PYTHONPATH": str(self.repo / "src"), "PYTHONHASHSEED": "0"},
-            )
-        except subprocess.TimeoutExpired as exc:
-            return 124, f"timed out after {timeout or self.timeout}s\n{exc}"
-        except FileNotFoundError as exc:
-            return 127, f"executable not found: {exc}"
-        out = (proc.stdout or "") + (("\n" + proc.stderr) if proc.stderr else "")
-        return proc.returncode, out.strip()
+        rc, stdout, stderr = run_child(
+            argv,
+            repo=self.repo,
+            protected=list(self.config.policy.protected),
+            timeout=timeout or self.timeout,
+            env={
+                "PATH": "/usr/local/bin:/usr/bin:/bin",
+                "HOME": str(Path.home()),
+                "PYTHONPATH": str(self.repo / "src"),
+                "PYTHONHASHSEED": "0",
+                "PYTHONNOUSERSITE": "1",
+            },
+        )
+        out = (stdout or "") + (("\n" + stderr) if stderr else "")
+        return rc, out.strip()
 
     def log(self, message: str) -> None:  # pragma: no cover - convenience hook
         self.extra.setdefault("log", []).append(message)
@@ -280,16 +279,15 @@ class ManifestGate(Gate):
     """Compare the tree against ``bootstrap.lock.json``.
 
     Drift on ordinary paths is expected while engineering and is reported, not
-    failed.  Drift on a *protected* path fails unless an amendment covers it.
-    Coverage is decided by :meth:`Amendment.covers` -- the same matcher the
-    ``protected-paths`` policy uses -- so a directory-pattern amendment covers
-    the files underneath it.
+    failed. Drift on a *protected* path fails unless a separately authorized,
+    current grant covers it. Grants are loaded from the integrity-checked ledger;
+    caller-supplied objects are never treated as authority.
     """
 
     name = "manifest"
     title = "Bootstrap lock matches the tree"
     blocking = True
-    why = "Protected files may only change under a ratified amendment."
+    why = "Protected files may only change under a current, separately authorized amendment."
 
     def check(self, ctx: GateContext) -> GateResult:
         started = time.time()
@@ -305,7 +303,9 @@ class ManifestGate(Gate):
             )
         manifest = Manifest.load(ctx.repo)
         diff = compare(manifest, ctx.repo)
-        amendments = list(ctx.extra.get("amendments") or [])
+        from ..bootstrap.amend import AmendmentLedger
+
+        amendments = AmendmentLedger(ctx.repo / ".ourob" / "amendments").active()
         violations = [
             path
             for path in diff.touched
@@ -314,13 +314,13 @@ class ManifestGate(Gate):
         ]
         detail = json.dumps(diff.to_dict(), indent=2)
         if amendments:
-            detail += "\namendments considered:\n" + "\n".join(
+            detail += "\nvalid operator grants considered:\n" + "\n".join(
                 f"  {a.amendment_id} [{a.status}] {', '.join(a.paths)}" for a in amendments
             )
         if violations:
             return self.result(
                 False,
-                f"unamended protected drift: {', '.join(violations)}",
+                f"unauthorized protected drift: {', '.join(violations)}",
                 detail,
                 started=started,
             )
@@ -409,8 +409,18 @@ class TestGate(Gate):
                 started=started,
             )
         # No -q here: the project's own addopts may already set it, and -qq
-        # suppresses the verdict line this gate reports.
-        argv = [ctx.python, "-m", "pytest", "--no-header", "-p", "no:cacheprovider", "--tb=short"]
+        # suppresses the verdict line this gate reports. Use sys-level capture:
+        # fd capture allocates an O_TMPFILE, which this child boundary rejects.
+        argv = [
+            ctx.python,
+            "-m",
+            "pytest",
+            "--no-header",
+            "-p",
+            "no:cacheprovider",
+            "--tb=short",
+            "--capture=sys",
+        ]
         workers = self._worker_args(ctx)
         argv += workers
         rc, out = ctx.subprocess(argv, timeout=ctx.timeout)

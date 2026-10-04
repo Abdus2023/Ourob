@@ -1,14 +1,14 @@
 # ourob runtime configuration.
 #
-# This file is PROTECTED. Writing to it requires a ratified amendment, because
-# it is where the runtime is told what it may not touch. See docs/CONSTITUTION.md.
+# This file is PROTECTED. Writing requires a separate operator grant for an exact
+# proposal, followed by verified promotion. See docs/CONSTITUTION.md.
 
 [runtime]
 name = "ourob"
 description = "autonomous-engineering runtime, self-hosted in this repository"
 
 [policy]
-# Paths the runtime may not modify without a ratified amendment.
+# Paths a runtime skill may not modify without a separate operator grant.
 protected = [
     "ourob.toml",
     "bootstrap.py",
@@ -27,8 +27,6 @@ allow_commands = [
     "git status",
     "git diff",
     "git log",
-    "git add",
-    "git commit",
     "ruff",
     "mypy",
 ]

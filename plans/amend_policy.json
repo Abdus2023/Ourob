@@ -1,5 +1,5 @@
 {
-  "goal": "Tighten the loop-breaker threshold, which requires amending a protected path",
+  "goal": "Show that a runtime proposal alone cannot authorize a protected-path write",
   "max_steps": 8,
   "stop_on_error": true,
   "steps": [
@@ -8,7 +8,7 @@
       "args": {
         "path": "src/ourob/policies/rules.py"
       },
-      "rationale": "see the current threshold"
+      "rationale": "observe the current protected threshold"
     },
     {
       "skill": "propose_amendment",
@@ -16,9 +16,9 @@
         "paths": [
           "src/ourob/policies/"
         ],
-        "rationale": "Lower MAX_REPEATS from 3 to 2 so a failing call is abandoned sooner."
+        "rationale": "Request to lower MAX_REPEATS from 3 to 2; this is only a proposal."
       },
-      "rationale": "protected paths cannot be written without one"
+      "rationale": "a runtime may propose but cannot authorize itself"
     },
     {
       "skill": "edit_file",
@@ -27,17 +27,12 @@
         "old_text": "    MAX_REPEATS = 3",
         "new_text": "    MAX_REPEATS = 2"
       },
-      "rationale": "the amendment itself"
-    },
-    {
-      "skill": "run_verification",
-      "args": {},
-      "rationale": "gates must still be green"
+      "rationale": "this attempt must be denied until an operator separately grants authority"
     },
     {
       "skill": "finish",
       "args": {
-        "summary": "Lowered MAX_REPEATS to 2 under an amendment; verification green.",
+        "summary": "Created an amendment proposal; the protected write was denied because a proposal is not authorization.",
         "success": true
       }
     }

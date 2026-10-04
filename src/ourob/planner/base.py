@@ -65,10 +65,10 @@ class RuntimeView:
     step_index: int
     budget_remaining: int
     skills: list[dict[str, Any]] = field(default_factory=list)
+    skill_discovery: dict[str, Any] = field(default_factory=dict)
     history: list[Observation] = field(default_factory=list)
     policies: list[dict[str, Any]] = field(default_factory=list)
     protected_paths: list[str] = field(default_factory=list)
-    amended_paths: list[str] = field(default_factory=list)
 
     def skill_names(self) -> list[str]:
         return [s["name"] for s in self.skills]

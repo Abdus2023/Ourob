@@ -119,7 +119,8 @@ def boot(
             raise BootstrapError(
                 "protected paths have drifted from bootstrap.lock.json: "
                 + ", ".join(violations)
-                + "\n  open an amendment (`ourob amend`) or pass --trust-drift to proceed."
+                + "\n  restore the locked tree, then propose and authorize before changing protected paths; "
+                "or explicitly pass --trust-drift to proceed."
             )
         if violations:
             report.notes.append(

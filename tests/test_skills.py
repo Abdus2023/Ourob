@@ -60,9 +60,7 @@ def test_dispatch_rejects_bad_arguments(registry: SkillRegistry, skill_ctx: Skil
 
 
 def test_dispatch_rejects_unknown_parameters(registry: SkillRegistry, skill_ctx: SkillContext) -> None:
-    result = registry.dispatch(
-        Invocation(skill="read_file", args={"path": "README.md", "wat": 1}), skill_ctx
-    )
+    result = registry.dispatch(Invocation(skill="read_file", args={"path": "README.md", "wat": 1}), skill_ctx)
     assert not result.ok
     assert "unexpected parameter" in (result.error or "")
 
@@ -87,20 +85,64 @@ def test_catalogue_is_planner_ready(registry: SkillRegistry) -> None:
 # -- self-extension -------------------------------------------------------
 
 
-def test_a_skill_written_into_contrib_becomes_available(repo: Path) -> None:
+def test_fresh_registry_loads_skill_written_before_startup(repo: Path) -> None:
     target = repo / CONTRIB_DIR
     target.mkdir(parents=True, exist_ok=True)
     (target / "shout.py").write_text(NEW_SKILL, encoding="utf-8")
 
     registry = SkillRegistry(repo)
-    problems = registry.discover()
-    assert problems == []
+    assert registry.discover() == []
     assert registry.has("shout")
+    assert registry.discovery_status()["complete"]
 
     ctx = SkillContext(repo=repo, services={})
     result = registry.dispatch(Invocation(skill="shout", args={"text": "hello"}), ctx)
     assert result.ok
     assert result.output == "HELLO"
+
+
+def test_kernel_freezes_registry_against_hot_registration(repo: Path) -> None:
+    from ourob.kernel import Kernel
+
+    registry = SkillRegistry(repo)
+    registry.discover()
+    original = type(registry.get("read_file"))
+    Kernel(repo, registry=registry, verify_at_end=False)
+    with pytest.raises(SkillError, match="registry is frozen"):
+        registry.register(original)
+
+
+def test_midrun_skill_file_is_pending_until_fresh_runtime(repo: Path) -> None:
+    registry = SkillRegistry(repo)
+    assert registry.discover() == []
+    target = repo / CONTRIB_DIR
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "shout.py").write_text(NEW_SKILL, encoding="utf-8")
+
+    status = registry.discovery_status()
+    assert status["complete"] is False
+    assert status["restart_required"] is True
+    assert status["pending"]["added"] == [f"{CONTRIB_DIR}/shout.py"]
+    assert not registry.has("shout")
+    assert registry.discover() == []  # repeat is idempotent, not a hot reload
+    assert not registry.has("shout")
+
+    ctx = SkillContext(repo=repo, services={"registry": registry})
+    listed = registry.dispatch(Invocation(skill="list_skills", args={}), ctx)
+    assert listed.ok
+    assert listed.data["discovery"]["restart_required"] is True
+    assert "fresh runtime" in listed.output
+
+    rejected = registry.dispatch(Invocation(skill="shout", args={"text": "hello"}), ctx)
+    assert not rejected.ok
+    assert "start a fresh runtime" in (rejected.error or "")
+
+    fresh = SkillRegistry(repo)
+    assert fresh.discover() == []
+    assert fresh.has("shout")
+    accepted = fresh.dispatch(Invocation(skill="shout", args={"text": "hello"}), ctx)
+    assert accepted.ok
+    assert accepted.output == "HELLO"
 
 
 def test_a_broken_contrib_skill_is_quarantined_not_fatal(repo: Path) -> None:
@@ -263,21 +305,15 @@ def test_list_dir_and_recursive_listing(skill_ctx: SkillContext, registry: Skill
     flat = registry.dispatch(Invocation(skill="list_dir", args={"path": "."}), skill_ctx)
     assert flat.ok
     assert any(e["path"] == "ourob.toml" for e in flat.data["entries"])
-    deep = registry.dispatch(
-        Invocation(skill="list_dir", args={"path": "src", "recursive": True}), skill_ctx
-    )
+    deep = registry.dispatch(Invocation(skill="list_dir", args={"path": "src", "recursive": True}), skill_ctx)
     assert deep.ok
     assert any(e["path"].startswith("src/ourob/") for e in deep.data["entries"])
 
 
 def test_grep_finds_and_reports_no_matches(skill_ctx: SkillContext, registry: SkillRegistry) -> None:
-    hit = registry.dispatch(
-        Invocation(skill="grep", args={"pattern": "def main", "path": "src"}), skill_ctx
-    )
+    hit = registry.dispatch(Invocation(skill="grep", args={"pattern": "def main", "path": "src"}), skill_ctx)
     assert hit.ok and hit.data["count"] > 0
-    miss = registry.dispatch(
-        Invocation(skill="grep", args={"pattern": "zzzz_no_such_token"}), skill_ctx
-    )
+    miss = registry.dispatch(Invocation(skill="grep", args={"pattern": "zzzz_no_such_token"}), skill_ctx)
     assert miss.ok and miss.data["count"] == 0
 
 
@@ -335,9 +371,7 @@ def test_run_command_enforces_the_allowlist(skill_ctx: SkillContext, registry: S
     assert "2" in allowed.output
 
 
-def test_run_command_rejects_shell_metacharacters(
-    skill_ctx: SkillContext, registry: SkillRegistry
-) -> None:
+def test_run_command_rejects_shell_metacharacters(skill_ctx: SkillContext, registry: SkillRegistry) -> None:
     result = registry.dispatch(
         Invocation(skill="run_command", args={"argv": ["python", "-c", "print(1); print(2)"]}),
         skill_ctx,
@@ -407,19 +441,18 @@ def test_finish_is_terminal(skill_ctx: SkillContext, registry: SkillRegistry) ->
     assert result.data["terminal"] is True
 
 
-def test_propose_amendment_skill_records_and_authorises(
-    repo: Path, store, config
-) -> None:
+def test_propose_amendment_skill_records_a_proposal_without_authorizing(repo: Path, store, config) -> None:
     from ourob.bootstrap.amend import AmendmentLedger
 
     registry = SkillRegistry(repo)
     registry.discover()
     ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+    run = store.open_run("test proposal skill", planner="test")
     ctx = SkillContext(
         repo=repo,
-        run_id="run-x",
+        run_id=run.run_id,
         store=store,
-        services={"config": config, "registry": registry, "ledger": ledger, "amended_paths": []},
+        services={"config": config, "registry": registry},
     )
     result = registry.dispatch(
         Invocation(
@@ -429,6 +462,9 @@ def test_propose_amendment_skill_records_and_authorises(
         ctx,
     )
     assert result.ok
-    assert ledger.authorising("src/ourob/policies/rules.py") is not None
-    assert ctx.services["amended_paths"] == ["src/ourob/policies/"]
-    assert any(e["kind"] == "amendment.proposed" for e in store.journal("run-x").events())
+    amendment_id = result.data["amendment_id"]
+    assert ledger.authorising("src/ourob/policies/rules.py") is None
+    assert ledger.authorising_id(amendment_id) is None
+    assert "ledger" not in ctx.services
+    assert not any(e["kind"] == "amendment.authorized" for e in store.system_events())
+    assert any(e["kind"] == "amendment.proposed" for e in store.journal(run.run_id).events())

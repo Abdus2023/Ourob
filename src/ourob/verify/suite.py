@@ -34,39 +34,12 @@ class VerificationSuite:
         gates: list[str] | None = None,
         state: StateStore | None = None,
         run_id: str = "",
-        amended_paths: list[str] | None = None,
     ) -> None:
         self.repo = Path(repo).resolve()
         self.config = config or Config.load(self.repo)
         self.state = state or StateStore(self.repo)
         self.run_id = run_id
         self.gate_names = gates if gates is not None else list(self.config.verify.gates)
-        self.amended_paths = list(amended_paths or [])
-
-    def amendments(self) -> list[Any]:
-        """Amendments that authorise protected drift during this verification.
-
-        Two sources, merged: the paths handed in for this session (a run that
-        proposed an amendment mid-flight) and whatever active amendments are
-        already on file.  Both are resolved with :meth:`Amendment.covers`, so a
-        directory pattern covers the files under it -- the same matcher the
-        ``protected-paths`` policy uses.
-        """
-        from ..bootstrap.amend import Amendment, AmendmentLedger
-
-        out: list[Any] = []
-        if self.amended_paths:
-            out.append(
-                Amendment(
-                    amendment_id=f"session:{self.run_id or 'verify'}",
-                    paths=list(self.amended_paths),
-                    rationale="authorised for this verification",
-                )
-            )
-        # AmendmentLedger.all() already skips documents it cannot parse, so an
-        # unreadable amendment simply fails to authorise anything -- fail closed.
-        out.extend(AmendmentLedger(self.repo / ".ourob" / "amendments").active())
-        return out
 
     def context(self) -> GateContext:
         return GateContext(
@@ -75,7 +48,6 @@ class VerificationSuite:
             timeout=self.config.verify.timeout,
             run_id=self.run_id,
             state=self.state,
-            extra={"amendments": self.amendments()},
         )
 
     def gates(self) -> list[Gate]:
@@ -101,8 +73,10 @@ class VerificationSuite:
         report.duration_ms = int((time.time() - started) * 1000)
         try:
             report.repo_digest = Manifest.load(self.repo).digest
+            report.tree_digest = Manifest.build(self.repo).digest
         except Exception:
             report.repo_digest = ""
+            report.tree_digest = ""
         if save:
             self.state.save_report(report)
         return report
@@ -117,15 +91,12 @@ def verify_repo(
     *,
     gates: list[str] | None = None,
     run_id: str = "",
-    amended_paths: list[str] | None = None,
     save: bool = True,
 ) -> SuiteOutcome:
     """Convenience entry point used by the CLI and by the ``run_verification`` skill."""
     config = Config.load(repo)
     names = gates if gates is not None else list(config.verify.gates)
-    suite = VerificationSuite(
-        repo, config, gates=names, run_id=run_id, amended_paths=amended_paths
-    )
+    suite = VerificationSuite(repo, config, gates=names, run_id=run_id)
     report = suite.run(save=save)
     return SuiteOutcome(report=report, unknown=unknown_gates(names))
 

@@ -43,7 +43,7 @@ class PolicyViolation(OurobError):
 
 
 class AmendmentRequired(PolicyViolation):
-    """A protected path was touched without a ratified amendment."""
+    """A protected path was touched without a valid separate operator grant."""
 
 
 class VerificationFailure(OurobError):

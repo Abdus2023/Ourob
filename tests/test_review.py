@@ -11,6 +11,8 @@ import contextlib
 import io
 from pathlib import Path
 
+from amendment_helpers import operator_authorize
+from ourob.bootstrap.amend import AmendmentLedger
 from ourob.bootstrap.snapshot import Snapshot
 from ourob.cli import main as cli_main
 from ourob.kernel import Kernel
@@ -255,10 +257,9 @@ def test_promotion_names_the_files_it_is_accepting(repo: Path) -> None:
 
 
 def test_promotion_names_protected_files_separately(repo: Path) -> None:
-    from ourob.bootstrap.amend import AmendmentLedger
-
     ledger = AmendmentLedger(repo / ".ourob" / "amendments")
     amendment = ledger.propose(["src/ourob/policies/"], "tighten a rule")
+    operator_authorize(ledger, amendment.amendment_id, authorized_by="review-test")
     target = repo / "src" / "ourob" / "policies" / "rules.py"
     target.write_text(
         target.read_text(encoding="utf-8").replace("MAX_REPEATS = 3", "MAX_REPEATS = 2"),

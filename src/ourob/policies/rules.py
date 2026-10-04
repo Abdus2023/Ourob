@@ -1,14 +1,15 @@
 """The guardrails, in code.
 
-Seven rules, each about one thing:
+Eight rules, each about one thing:
 
 ``path-confinement``   no path argument may leave the repository.
 ``protected-paths``    the bootstrap, policies, verifier and config may only be
-                       written under an amendment.
+                       written under a separate current operator grant.
 ``journal-integrity``  nothing may write into the runtime's own history.
 ``budget``             a run has a finite number of steps.
 ``payload-size``       no single write may exceed a sane size.
 ``command-allowlist``  ``run_command`` may only run what the config allows.
+``child-filesystem``   child code is refused unless a write boundary is available.
 ``loop-breaker``       the same failing call may not be retried forever.
 
 Path confinement no longer guesses.  A skill declares which of its parameters
@@ -23,7 +24,73 @@ These live in a protected directory.  Changing them is a constitutional act.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from .base import Policy, ReviewContext, Verdict
+
+
+def _within(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def _lexical_repo_rel(repo: Path, value: str) -> str | None:
+    """Return the normalized spelling under repo without resolving symlinks."""
+    root = Path(repo).resolve()
+    candidate = Path(value)
+    joined = candidate if candidate.is_absolute() else root / candidate
+    lexical = Path(os.path.abspath(joined))
+    try:
+        return lexical.relative_to(root).as_posix()
+    except ValueError:
+        return None
+
+
+def _protected_logical_paths(ctx: ReviewContext, value: str, target: Path) -> list[str]:
+    """Map a real target back to every protected logical path that reaches it.
+
+    Checking only the resolved target misses a protected path whose own symlink
+    points into an unprotected directory. Checking only the supplied spelling
+    misses aliases to protected files. Both directions matter for mutation.
+    """
+    repo = Path(ctx.repo).resolve()
+    real_target = Path(target).resolve(strict=False)
+    try:
+        real_rel = real_target.relative_to(repo).as_posix()
+    except ValueError:
+        return []
+
+    matches: set[str] = set()
+    lexical_rel = _lexical_repo_rel(repo, value)
+    if lexical_rel is not None and ctx.config.is_protected(lexical_rel):
+        matches.add(lexical_rel)
+    if ctx.config.is_protected(real_rel):
+        matches.add(real_rel)
+
+    for raw in ctx.config.policy.protected:
+        pattern = str(raw).replace("\\", "/").strip()
+        directory = pattern.endswith("/")
+        logical_root = pattern.rstrip("/")
+        if (
+            not logical_root
+            or logical_root.startswith("/")
+            or any(part == ".." for part in logical_root.split("/"))
+        ):
+            continue
+        resolved_root = (repo / logical_root).resolve(strict=False)
+        if not _within(resolved_root, repo) or not _within(real_target, resolved_root):
+            continue
+        if directory:
+            suffix = real_target.relative_to(resolved_root).as_posix()
+            matches.add(logical_root if suffix == "." else f"{logical_root}/{suffix}")
+        elif real_target == resolved_root:
+            matches.add(logical_root)
+
+    return sorted(matches)
 
 
 class PathConfinementPolicy(Policy):
@@ -50,10 +117,10 @@ class PathConfinementPolicy(Policy):
 
 class ProtectedPathPolicy(Policy):
     name = "protected-paths"
-    title = "Guardrail files need an amendment"
+    title = "Guardrail files need a separate operator grant"
     description = (
-        "Mutating skills may not write to the bootstrap, the policy engine, the "
-        "verifier or ourob.toml unless an active amendment authorises that path."
+        "Mutating skills may not write protected paths unless an integrity-checked "
+        "system-journal grant matches the current proposal, revision, digest, and path."
     )
     blocking = True
 
@@ -69,24 +136,30 @@ class ProtectedPathPolicy(Policy):
         for _key, value in ctx.path_args():
             try:
                 target = fsx.confine(ctx.repo, value)
-                relpath = fsx.rel(target, ctx.repo)
             except PathEscapeError:
                 continue  # path-confinement owns that failure
-            if not ctx.config.is_protected(relpath):
+            logical_paths = _protected_logical_paths(ctx, value, target)
+            if not logical_paths:
                 continue
-            amendment = ctx.amendment_for(relpath)
-            if amendment is not None:
-                authorised.append(f"{relpath} ({amendment.amendment_id})")
-            elif relpath in ctx.amended_paths():
-                authorised.append(relpath)
+            grant = next(
+                (
+                    (logical, amendment)
+                    for logical in logical_paths
+                    if (amendment := ctx.amendment_for(logical)) is not None
+                ),
+                None,
+            )
+            if grant is not None:
+                logical, amendment = grant
+                authorised.append(f"{logical} ({amendment.amendment_id})")
             else:
-                offenders.append(relpath)
+                offenders.extend(logical_paths)
         if offenders:
             return Verdict.deny(
                 self.name,
-                "protected path(s) require a ratified amendment: "
+                "protected path(s) require a separately authorized amendment: "
                 + ", ".join(offenders)
-                + " (use the propose_amendment skill, then `ourob ratify`)",
+                + " (a proposal is not authority; an operator must use `ourob authorize`, then promote)",
             )
         if authorised:
             return Verdict.allow(self.name, f"amendment covers {', '.join(authorised)}")
@@ -97,13 +170,11 @@ class JournalIntegrityPolicy(Policy):
     name = "journal-integrity"
     title = "History is append-only"
     description = (
-        "No skill may write, edit or delete anything under .ourob/journal, "
-        ".ourob/index.jsonl or .ourob/verify -- the record of what the runtime "
-        "did must be harder to alter than the thing it records."
+        "No ordinary mutating skill may write, edit, or delete runtime state under "
+        ".ourob, including run journals, .head anchors, promotion history, and "
+        "amendment proposals. Child processes receive an OS write boundary as well."
     )
     blocking = True
-
-    FORBIDDEN = (".ourob/journal", ".ourob/index.jsonl", ".ourob/verify")
 
     def review(self, ctx: ReviewContext) -> Verdict:
         mutating = bool(ctx.services.get("mutating_skills", {}).get(ctx.skill, False))
@@ -112,16 +183,20 @@ class JournalIntegrityPolicy(Policy):
         from .. import fsx
         from ..errors import PathEscapeError
 
+        state_root = (Path(ctx.repo) / ".ourob").resolve(strict=False)
         for _key, value in ctx.path_args():
             try:
-                relpath = fsx.rel(fsx.confine(ctx.repo, value), ctx.repo)
+                target = fsx.confine(ctx.repo, value)
             except PathEscapeError:
                 continue
-            for forbidden in self.FORBIDDEN:
-                if relpath == forbidden or relpath.startswith(forbidden.rstrip("/") + "/"):
-                    return Verdict.deny(
-                        self.name, f"{relpath} is part of the runtime's history and is immutable"
-                    )
+            lexical = _lexical_repo_rel(ctx.repo, value)
+            lexical_state_path = lexical == ".ourob" or bool(lexical and lexical.startswith(".ourob/"))
+            resolved_state_path = _within(target, state_root)
+            if lexical_state_path or resolved_state_path:
+                relpath = lexical if lexical_state_path else fsx.rel(target, ctx.repo)
+                return Verdict.deny(
+                    self.name, f"{relpath} resolves into the runtime's history and is immutable"
+                )
         return Verdict.allow(self.name)
 
 
@@ -133,9 +208,7 @@ class BudgetPolicy(Policy):
 
     def review(self, ctx: ReviewContext) -> Verdict:
         if ctx.budget_used >= ctx.budget_limit:
-            return Verdict.deny(
-                self.name, f"step budget exhausted ({ctx.budget_used}/{ctx.budget_limit})"
-            )
+            return Verdict.deny(self.name, f"step budget exhausted ({ctx.budget_used}/{ctx.budget_limit})")
         return Verdict.allow(self.name, f"{ctx.budget_used}/{ctx.budget_limit} steps used")
 
 
@@ -177,10 +250,39 @@ class CommandAllowlistPolicy(Policy):
                 return Verdict.deny(self.name, f"matches deny pattern {pattern!r}")
         allowed = ctx.config.policy.allow_commands
         if allowed and not any(joined == a or joined.startswith(a + " ") for a in allowed):
-            return Verdict.deny(
-                self.name, f"{joined!r} is not on the allowlist ({', '.join(allowed)})"
-            )
+            return Verdict.deny(self.name, f"{joined!r} is not on the allowlist ({', '.join(allowed)})")
         return Verdict.allow(self.name)
+
+
+class ChildFilesystemPolicy(Policy):
+    name = "child-filesystem"
+    title = "Child content writes require a filesystem boundary"
+    description = (
+        "Child-process skills require Linux Landlock restrictions to deny content "
+        "and namespace writes under protected paths, runtime state, and Git metadata. "
+        "File-mode and timestamp changes are not confined."
+    )
+    blocking = True
+
+    CHILD_SKILLS = {"run_command", "run_python", "run_tests", "run_verification"}
+
+    def review(self, ctx: ReviewContext) -> Verdict:
+        if ctx.skill not in self.CHILD_SKILLS:
+            return Verdict.allow(self.name, "skill does not execute child code")
+        from ..child_sandbox import landlock_status
+
+        status = landlock_status()
+        if not status.available:
+            return Verdict.deny(
+                self.name,
+                "refusing child execution because filesystem write confinement is unavailable: "
+                + status.reason,
+            )
+        return Verdict.allow(
+            self.name,
+            f"Landlock ABI {status.abi}: content/namespace writes to protected paths, "
+            ".ourob, and .git are denied; mode/time changes are not confined",
+        )
 
 
 class LoopBreakerPolicy(Policy):
@@ -212,6 +314,7 @@ POLICY_CLASSES: dict[str, type[Policy]] = {
         BudgetPolicy,
         PayloadSizePolicy,
         CommandAllowlistPolicy,
+        ChildFilesystemPolicy,
         LoopBreakerPolicy,
     )
 }

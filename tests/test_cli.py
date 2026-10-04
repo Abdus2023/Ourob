@@ -227,21 +227,65 @@ def test_journal_check_detects_tampering(repo: Path) -> None:
     assert "BAD " in out
 
 
-def test_amend_and_list(repo: Path) -> None:
+def test_amend_proposes_but_does_not_authorize_or_ratify(repo: Path) -> None:
     code, out = run(repo, "amend", "src/ourob/policies/", "--why", "tighten a rule")
     assert code == 0
     amendment_id = out.split("proposed ")[1].split()[0]
-    assert "ourob promote --amendment" in out
+    assert "ourob authorize" in out
+    assert "does not authorize writes" in out
 
     code, out = run(repo, "amend", "--list")
     assert code == 0 and amendment_id in out and "[proposed]" in out
 
     code, out = run(repo, "ratify", amendment_id, "--message", "tightened", "--no-git")
-    assert code == 0
-    assert "ratified" in out
+    assert code == 1
+    assert "no valid current operator authorization" in out
 
     code, out = run(repo, "amend", "--list")
-    assert "[ratified]" in out
+    assert "[proposed]" in out
+
+
+def test_authorize_is_a_separate_interactive_operator_action(repo: Path, monkeypatch) -> None:
+    import builtins
+
+    from ourob.bootstrap.amend import AmendmentLedger, AmendmentStatus
+
+    code, out = run(repo, "amend", "src/ourob/policies/", "--why", "change retry policy")
+    assert code == 0
+    amendment_id = out.split("proposed ")[1].split()[0]
+    ledger = AmendmentLedger(repo / ".ourob" / "amendments")
+
+    class Pipe:
+        def isatty(self) -> bool:
+            return False
+
+    monkeypatch.setattr("sys.stdin", Pipe())
+    code, out = run(repo, "authorize", amendment_id, "--by", "reviewer")
+    assert code == 2
+    assert "interactive operator terminal" in out
+    assert ledger.active() == []
+
+    class Terminal:
+        def isatty(self) -> bool:
+            return True
+
+    monkeypatch.setattr("sys.stdin", Terminal())
+    monkeypatch.setattr(builtins, "input", lambda _prompt: amendment_id)
+    code, out = run(repo, "authorize", amendment_id, "--by", "reviewer")
+    assert code == 0, out
+    assert "authorized" in out
+    assert ledger.authorising_id(amendment_id) is not None
+
+    target = repo / "src" / "ourob" / "policies" / "rules.py"
+    target.write_text(
+        target.read_text(encoding="utf-8").replace("MAX_REPEATS = 3", "MAX_REPEATS = 2"),
+        encoding="utf-8",
+    )
+    code, out = run(repo, "ratify", amendment_id, "--message", "reviewed change", "--no-git")
+    assert code == 0, out
+    assert "promotion ACCEPTED" in out
+    assert ledger.load(amendment_id).status == AmendmentStatus.RATIFIED
+    assert ledger.authorising_id(amendment_id) is None
 
 
 def test_amend_can_withdraw_authority(repo: Path) -> None:
@@ -260,7 +304,7 @@ def test_amend_can_withdraw_authority(repo: Path) -> None:
     (repo / "src" / "ourob" / "policies" / "rules.py").write_text("# t\n", encoding="utf-8")
     code, out = run(repo, "promote", "--amendment", amendment_id, "--no-git", "--no-rollback")
     assert code == 1
-    assert "not active" in out
+    assert "no valid current operator authorization" in out
 
 
 def test_amend_requires_paths(repo: Path) -> None:
@@ -316,11 +360,11 @@ def test_snapshot_rollback_restores_the_tree(repo: Path) -> None:
     code, out = run(repo, "snapshots")
     run_id = out.strip().splitlines()[0].split()[0]
 
-    assert (repo / "tests" / "test_contrib_rot13.py").is_file()
+    assert (repo / "tests" / "test_contrib_text_metrics.py").is_file()
     code, out = run(repo, "snapshots", "--rollback", run_id)
     assert code == 0
     assert "rolled back to snapshot" in out
-    assert not (repo / "tests" / "test_contrib_rot13.py").exists()
+    assert not (repo / "tests" / "test_contrib_text_metrics.py").exists()
     assert "drift since snapshot: no drift" in out
 
 

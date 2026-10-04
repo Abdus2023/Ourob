@@ -33,9 +33,12 @@ skill invocation per turn.
 
 Rules you are expected to work within:
 - Every path you pass must be relative to the repository root and must stay inside it.
-- Protected paths cannot be written without an amendment; if you need one, use the
-  propose_amendment skill and explain why in the rationale.
+- Protected paths cannot be written without a currently valid, separately recorded
+  operator authorization. propose_amendment creates only a proposal; it never grants
+  authority. Only an operator may use the standalone authorize command.
 - The runtime's history under .ourob/ is append-only; do not try to write there.
+- Skill discovery is a startup snapshot. New or changed contrib files are pending;
+  do not invoke them in this run. Verify and promote, then start a fresh runtime.
 - After changing anything in the runtime, run run_verification before finishing.
 - Finish by calling the `finish` skill with an honest summary.
 
@@ -48,11 +51,21 @@ def _render_view(view: RuntimeView) -> str:
         f"GOAL: {view.goal}",
         f"RUN: {view.run_id}  step {view.step_index}  budget remaining {view.budget_remaining}",
         "",
-        "PROTECTED PATHS (write requires an amendment):",
-        *(  [f"  - {p}" for p in view.protected_paths] or ["  (none)"]  ),
-        "",
-        "SKILLS:",
+        "PROTECTED PATHS (write requires a valid separate operator grant):",
+        *([f"  - {p}" for p in view.protected_paths] or ["  (none)"]),
     ]
+    discovery = view.skill_discovery
+    lines.extend(
+        [
+            "",
+            "SKILL DISCOVERY (startup snapshot; do not invoke pending files):",
+            f"  complete: {discovery.get('complete', 'unknown')}",
+        ]
+    )
+    for change, paths in discovery.get("pending", {}).items():
+        if paths:
+            lines.append(f"  {change}: {', '.join(paths)}")
+    lines += ["", "SKILLS:"]
     for entry in view.skills:
         lines.append(f"  {entry['name']} -- {entry['description']}")
         for pname, rule in entry.get("params", {}).items():

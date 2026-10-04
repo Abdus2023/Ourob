@@ -44,7 +44,7 @@ transcript of what has happened so far. It sees no more than that.
 planner ──► Invocation ──► PolicySet ──► journal ──► skill ──► journal
 ```
 
-`PolicySet.review` is deny-wins across seven rules. Every verdict — **including
+`PolicySet.review` is deny-wins across eight rules. Every verdict — **including
 the allows** — is written to the journal, so after the fact you can reconstruct
 not just what the runtime did but what it was permitted to do and by which rule.
 
@@ -52,7 +52,7 @@ Policies are small on purpose. Each one inspects a single property of a single
 call. They have no memory of each other and cannot negotiate. A policy that
 raises an exception becomes a denial; the failure direction is always "no".
 
-Three of the seven deserve a note:
+Three of the eight deserve a note:
 
 - **`journal-integrity`** forbids writes to `.ourob/journal`, `.ourob/verify` and
   `.ourob/index.jsonl`. The record of what the runtime did must be harder to
@@ -64,7 +64,10 @@ Three of the seven deserve a note:
   and not declaring it — is closed *statically*, by `check_spec`, which the
   `skill-contract` gate delegates to. A skill like that cannot be registered.
 - **`protected-paths`** consults the same declared list, so a path carried under
-  an unusual key is still subject to the amendment rule.
+  an unusual key is still subject to the amendment rule. A proposal file is not
+  authority: a separate interactive operator action pins its digest, base
+  revision, lock digest, and exact paths in the system journal before a protected
+  write can pass.
 
 ## 4. History is append-only and tamper-evident
 
@@ -74,20 +77,25 @@ a valid prefix — so each journal also has a `.head` anchor naming the last
 sequence number and hash, rewritten atomically on every append. A log shorter
 than its anchor has been truncated.
 
-`ourob journal --check` verifies every chain. `ourob show <run>` reconstructs a
-`Run` object from its log alone, with no other state.
+`ourob journal --check` verifies every run, index, and system-event chain,
+including `.head` anchors and system-event transition rules. `ourob show <run>`
+reconstructs a `Run` object from its log alone, with no other state.
 
 ## 5. Acceptance is a separate act from execution
 
 Running a plan leaves **drift**. Drift is not a version of the runtime. Only
 `ourob promote` makes a change official, and it does five things in order:
 
-1. diff the tree against the last ratified lock;
-2. require an amendment for any protected path that drifted;
-3. run the verification suite;
-4. on failure — roll the tree back to the pre-run snapshot and mark the amendment
-   rejected, leaving the repository byte-identical to how it started;
-5. on success — rewrite the lock, commit, ratify the amendment.
+1. diff the tree against the current bootstrap lock;
+2. for protected drift, require a current separate operator grant that covers the
+   exact proposal, base revision, lock digest, and paths;
+3. run the verification suite and require its tree digest to match the
+   pre-promotion tree digest;
+4. on failure — reject any grant and, when a snapshot is available, roll the tree
+   back to the pre-run snapshot;
+5. on success — require the candidate lock digest to equal the verified tree
+   digest, write the lock, commit if enabled, and record the terminal promotion
+   event. A grant is not itself acceptance.
 
 ### Promotion is meant to be read
 
@@ -130,29 +138,38 @@ the runtime stricter. It cannot make it laxer.
 
 ## Why the child process is capped before it execs
 
-`run_command` and `run_python` execute code the planner produced. A wall-clock
-timeout bounds how *long* that can take and nothing else. The children are
-therefore forked with a pre-exec hook that calls `setrlimit` — address space,
-per-file size, optionally CPU seconds and process count — which runs after the
-fork and before the exec, so the child never has the chance to raise its own
-ceiling. `start_new_session` puts it in its own process group, which is what
-lets a timeout reap the whole tree; without it a grandchild outlives the run
-that spawned it and keeps writing after the kernel has declared the step timed
-out.
+`run_command` and `run_python` execute code in a child process. Before `exec`,
+a pre-exec hook applies `setrlimit` limits (address space, per-file size,
+optionally CPU seconds and process count), installs Linux Landlock rules for
+content/namespace writes, and applies a narrow seccomp filter for selected
+ownership/xattr mutations. `chmod` and timestamp changes are not mediated. The
+Landlock rules exclude configured protected paths, `.ourob`, and `.git`; children
+can create or modify content and namespace entries only under existing
+unprotected repository directories and a per-call temporary root. Descendants inherit the restrictions. `start_new_session`
+lets a timeout reap the complete process group.
 
 The limits are deliberately loose (2 GB address space, 256 MB per file). They
 exist to stop a runaway, not to constrain work, and `0` disables any of them.
+The filesystem rule is a **narrow child-write boundary**, not a general OS
+sandbox: reads, networking, general process inspection, file-mode changes, and
+timestamp changes are not restricted; arbitrary in-process Python and the
+checkout owner are outside this control. When
+the required Landlock boundary is unavailable, child-code skills fail closed.
 
 ## Why skills are discovered rather than declared
 
 `skills/builtin/` is imported as a package; `skills/contrib/` is imported by file
-path with `importlib`. Adding a capability is therefore *writing a file* — no
-registration call, no table to edit, no install step. A skill written during a run
-is live on the next discovery pass.
+path with `importlib`. A `SkillRegistry` takes one discovery snapshot at startup;
+`discover()` is idempotent, and the `Kernel` freezes the registry before running.
+A file added, changed, or removed during a run is reported as pending and is not
+hot-loaded or invoked by that registry. Verify and promote the contribution,
+then create a fresh runtime to discover and invoke it.
 
 Discovery returns problems rather than raising, because a half-written contrib
 file must not stop the runtime from booting. It should stop the runtime from
-*using* that skill. Duplicate names are refused and the built-in wins.
+*using* that skill. Duplicate names are refused and the built-in wins. A stale
+registry reports `restart_required` rather than presenting the old catalogue as
+current.
 
 ## Failure directions
 
@@ -171,11 +188,11 @@ Nothing in the runtime treats an unexpected exception as permission.
 
 ## What is deliberately *not* here
 
-- **No sandboxing of child processes.** `run_python` and `run_command` run with
-  the runtime's own privileges, confined only by working directory, a stripped
-  environment, an allowlist and a timeout. Real isolation would need an OS-level
-  mechanism (namespaces, seccomp, a container) and pretending otherwise would be
-  worse than saying so.
+- **No general OS sandbox or privilege separation.** Child processes have a
+  Linux Landlock write boundary and selected seccomp restrictions, but they still
+  run with the runtime's user privileges. Reads, networking, and general process
+  inspection are not confined. Arbitrary in-process Python and the checkout owner
+  can bypass application APIs; do not treat this as a security boundary.
 - **No concurrent runs.** One kernel, one loop, one journal at a time.
 - **No semantic understanding of changes.** The gates check that the tree
   compiles, imports, lints, passes tests, cold-starts and has not silently
